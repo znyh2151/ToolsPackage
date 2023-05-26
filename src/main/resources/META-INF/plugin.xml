@@ -3,6 +3,7 @@
     <id>com.tools.ToolsPackage</id>
     <name>ToolsPackage</name>
     <vendor email="znyh2151@gmail.com">PackagingTools</vendor>
+    <description>This plug-in is for the Android packaging tool</description>
     <depends>com.intellij.modules.platform</depends>
     <extensions defaultExtensionNs="com.intellij">
     </extensions>
