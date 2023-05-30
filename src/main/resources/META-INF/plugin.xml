@@ -3,7 +3,13 @@
     <id>com.tools.ToolsPackage</id>
     <name>ToolsPackage</name>
     <vendor email="znyh2151@gmail.com">PackagingTools</vendor>
-    <description>This plug-in is for the Android packaging tool</description>
+    <description><![CDATA[
+    This is used to replace versionCode, versionName, and applicationId in the Android Project. When the commit is complete, git commit is automatically executed and you can optionally push the remote side directly
+    The use steps are as follows:
+    1. The project supports git repository
+    2. Create the PackageToolsConfig.json file in the project root directory
+    3.AS the top Tools -&gt; Build Package ->  Plugin popover -> Edit packaging information -> submit
+          ]]></description>
     <depends>com.intellij.modules.platform</depends>
     <extensions defaultExtensionNs="com.intellij">
     </extensions>
