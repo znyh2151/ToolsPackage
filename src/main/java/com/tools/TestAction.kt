@@ -47,7 +47,7 @@ class TestAction : AnAction() {
         rootPath = e.project?.basePath!!
         config = readConfigFile(rootPath)
         writeLogToFile("当前路径$rootPath")
-        writeLogToFile(cmdExec("pwd", dir = rootPath))
+        cmdExec("pwd", dir = rootPath)
         initView()
     }
 
@@ -58,7 +58,7 @@ class TestAction : AnAction() {
         val panel = JPanel(GridBagLayout())
         jRootFrame.contentPane.add(panel)
 
-        val projectList = config.packet.keys.toList()
+        val projectList = config.packet.keys.toList().sorted()
         jProjectList = JComboBox(projectList.toTypedArray())
         jProjectList.addActionListener {
             refreshUI()
@@ -322,42 +322,52 @@ class TestAction : AnAction() {
             if (jTagCmd.isSelected && data.tag.isNotEmpty()) {
                 data.cmd += " " + data.tag
             }
-            writeLogToFile(cmdExec("git", "reset", "--hard", "HEAD", dir = rootPath))
+            cmdExec("git", "reset", "--hard", "HEAD", dir = rootPath)
             writeReplaceFile(config, data)
             updateConfigFile()
-            writeLogToFile(cmdExec("git", "add", ".", dir = rootPath))
+            cmdExec("git", "add", ".", dir = rootPath)
             if (cmdExec("git", "status", dir = rootPath).contains("Changes")) {
-                writeLogToFile(cmdExec("git", "commit", "-m", data.cmd, dir = rootPath))
+                cmdExec("git", "commit", "-m", data.cmd, dir = rootPath)
             } else {
-                writeLogToFile(cmdExec("git", "commit", "--allow-empty", "-m", data.cmd, dir = rootPath))
+                cmdExec("git", "commit", "--allow-empty", "-m", data.cmd, dir = rootPath)
             }
             if (data.tag.isNotEmpty()) {
                 data.tag =
                     "${selectedPacketCode.capitalize()}-${data.versionName}-${data.versionCode}-${todayDate()}-${data.tag}"
                 // 删除本地和远端tag
-                writeLogToFile(cmdExec("git", "tag", "-d", data.tag))
-                writeLogToFile(cmdExec("git", "push", "origin", "--delete", "refs/tags/${data.tag}"))
+                cmdExec("git", "tag", "-d", data.tag)
+                cmdExec("git", "push", "origin", "--delete", "refs/tags/${data.tag}")
                 // 添加tag
-                writeLogToFile(cmdExec("git", "tag", data.tag))
+                cmdExec("git", "tag", data.tag)
             }
             ConfirmationDialog(jRootFrame, "通知", "提交成功，是否push到远端", {
                 Thread {
                     val currentBranchName = cmdExec("git", "rev-parse", "--abbrev-ref", "HEAD", dir = rootPath)
-                    if (currentBranchName.isNotEmpty() && currentBranchName != "-1"
-                        && cmdExec("git", "push", "origin", currentBranchName, "--tags", dir = rootPath) != "-1"
-                    ) {
-                        ConfirmationDialog(
-                            jRootFrame,
-                            "通知",
-                            "push成功！！！",
-                            { refreshUI() },
-                            { refreshUI() })
-
+                    if (currentBranchName.isNotEmpty() && currentBranchName != "-1") {
+                        if (if (data.tag.isNotEmpty()) {
+                            cmdExec("git", "push", "origin", currentBranchName, "--tags", dir = rootPath) != "-1"
+                        } else {
+                            cmdExec("git", "push", "origin", currentBranchName, "--tags", dir = rootPath) != "-1"
+                        }){
+                            ConfirmationDialog(
+                                jRootFrame,
+                                "通知",
+                                "push成功！！！",
+                                { refreshUI() },
+                                { refreshUI() })
+                        } else {
+                            ConfirmationDialog(
+                                jRootFrame,
+                                "通知",
+                                "push命令执行失败了！！！",
+                                { refreshUI() },
+                                { refreshUI() })
+                        }
                     } else {
                         ConfirmationDialog(
                             jRootFrame,
                             "通知",
-                            "失败！！！，请检测后再尝试",
+                            "rev-parse执行获取分支名失败了！！！，请检测后再尝试",
                             { refreshUI() },
                             { refreshUI() })
                     }
@@ -394,7 +404,9 @@ class TestAction : AnAction() {
                 output.appendln(it)
             }
         }
-        return output.toString().trimEnd()
+        val result = output.toString().trimEnd()
+        writeLogToFile(result)
+        return result
     }
 
     private fun updateConfigFile() {
