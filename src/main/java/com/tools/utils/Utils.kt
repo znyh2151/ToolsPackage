@@ -25,6 +25,10 @@ object Utils {
 
     fun initPath(rootPath: String) {
         this.rootPath = rootPath
+        flavorPrefixPath = ""
+        buildGradlePath = ""
+        versions = emptyList()
+        flavors = emptyList()
         println(rootPath)
         writeLogToFile("rootPath:$rootPath")
     }
@@ -78,6 +82,8 @@ object Utils {
 
     private fun getAllFlavors(): List<String> {
         flavorPrefixPath = findFlavorPrefixPath()
+        buildGradlePath = findBuildGradlePrefixPath()
+        cmdExec("git", "fetch", "origin", "--tags", "-f")
         val mainSrcPath = File(flavorPrefixPath)
         if (!mainSrcPath.exists() || !mainSrcPath.isDirectory) {
             return emptyList()
@@ -97,7 +103,19 @@ object Utils {
             }
             result
         }
-        val flavors = (flavorDirs?.map { it.name } ?: emptyList()).sortedDescending()
+        val flavors = (flavorDirs?.map { it.name } ?: emptyList()).sortedWith { str1, str2 ->
+            val num1 = str1.filter { it.isDigit() }.toIntOrNull()
+            val num2 = str2.filter { it.isDigit() }.toIntOrNull()
+            if (num1 != null && num2 != null) {
+                num2.compareTo(num1)
+            } else if (num1 != null) {
+                -1
+            } else if (num2 != null) {
+                1
+            } else {
+                str1.compareTo(str2)
+            }
+        }
         writeLogToFile("getFlavors: $flavors")
         return flavors
     }
