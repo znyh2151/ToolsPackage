@@ -1,26 +1,21 @@
 package com.tools
 
-import com.google.gson.Gson
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.util.ui.JBUI
 import com.tools.bean.*
-import com.tools.bean.CONFIG_NAME
 import com.tools.utils.ConfirmationDialog
+import com.tools.utils.Utils
 import com.tools.utils.getVersionDiff
 import com.tools.utils.todayDate
-import org.jetbrains.concurrency.runAsync
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
 import java.io.*
-import java.lang.StringBuilder
 import javax.swing.*
 
 class TestAction : AnAction() {
 
     private var rootPath = ""
-    private lateinit var config: PackageConfig
-    private var selectedPacket: Packet? = null
     private var selectedPacketCode = ""
     private lateinit var uiData: UIData
     private lateinit var jProjectList: JComboBox<String>
@@ -39,15 +34,12 @@ class TestAction : AnAction() {
     private lateinit var jStoreName: JCheckBox
     private lateinit var jStoreIcon: JCheckBox
     private lateinit var jAuditPackage: JCheckBox
-    private lateinit var jUpdateVersion: JCheckBox
-    private lateinit var jTagCmd: JCheckBox
     private lateinit var jRootFrame: JFrame
 
     override fun actionPerformed(e: AnActionEvent) {
         rootPath = e.project?.basePath!!
-        config = readConfigFile(rootPath)
-        writeLogToFile("当前路径$rootPath")
-        cmdExec("pwd", dir = rootPath)
+        Utils.initPath(rootPath)
+        Utils.writeLogToFile("当前路径$rootPath")
         initView()
     }
 
@@ -58,8 +50,7 @@ class TestAction : AnAction() {
         val panel = JPanel(GridBagLayout())
         jRootFrame.contentPane.add(panel)
 
-        val projectList = config.packet.keys.toList().sorted()
-        jProjectList = JComboBox(projectList.toTypedArray())
+        jProjectList = JComboBox(emptyArray())
         jProjectList.addActionListener {
             refreshUI()
         }
@@ -198,7 +189,6 @@ class TestAction : AnAction() {
         jStoreName = JCheckBox("StoreName")
         jAuditPackage = JCheckBox("AuditPackage")
         jStoreIcon = JCheckBox("StoreIcon")
-        jUpdateVersion = JCheckBox("更新版本号")
         panel.add(jGT, GridBagConstraints().apply {
             gridx = 0
             gridy = 11
@@ -225,25 +215,12 @@ class TestAction : AnAction() {
             gridy = 13
             anchor = GridBagConstraints.LINE_START
         })
-        panel.add(jUpdateVersion, GridBagConstraints().apply {
-            gridx = 1
-            gridy = 13
-            anchor = GridBagConstraints.LINE_START
-        })
-        jTagCmd = JCheckBox("CmdWithTag")
-        panel.add(jTagCmd, GridBagConstraints().apply {
-            gridx = 0
-            gridy = 14
-            anchor = GridBagConstraints.LINE_START
-        })
-        jTagCmd.isSelected = true
-        jUpdateVersion.isSelected = true
         jSubmitButton = JButton("提交打包请求").apply {
             addActionListener { submitBuild() }
         }
         panel.add(jSubmitButton, GridBagConstraints().apply {
             gridx = 0
-            gridy = 15
+            gridy = 14
             gridwidth = 2
             fill = GridBagConstraints.HORIZONTAL
             insets = JBUI.insets(10, 0)
@@ -255,7 +232,11 @@ class TestAction : AnAction() {
             defaultCloseOperation = JFrame.HIDE_ON_CLOSE
             isVisible = true
         }
-        refreshUI()
+        Thread {
+            jProjectList.model = DefaultComboBoxModel(Utils.flavors.toTypedArray())
+            Utils.refreshData(jProjectList.selectedItem!!.toString())
+            refreshUI()
+        }.start()
     }
 
     private fun submitBuild() {
@@ -271,10 +252,9 @@ class TestAction : AnAction() {
             applicationId = jAppId.text.trim(),
             tag = jTag.text
         )
-
         if (isNeedWarningDialog(uiData)) return
-        if (selectedPacket!!.versionCode.isNotEmpty()) {
-            val diffCode = getVersionDiff(uiData.versionName, selectedPacket!!.version[0])
+        if (Utils.versions.isNotEmpty()) {
+            val diffCode = getVersionDiff(uiData.versionName, Utils.versions[0])
             // 版本号异常
             if (diffCode == 0) {
                 showWarningDialog("版本号与上次版本相同，请检测！！！<br><br> 是否确定打包？") {
@@ -288,7 +268,7 @@ class TestAction : AnAction() {
                 }
                 return
             }
-            if (selectedPacket!!.versionCode.contains(uiData.versionCode.toInt())) {
+            if (Utils.versions.contains(uiData.versionName.trim())) {
                 showWarningDialog("版本号已存在，请确认是否继续！！！<br><br> 是否确定打包？") {
                     commit(uiData)
                 }
@@ -319,36 +299,51 @@ class TestAction : AnAction() {
             if (data.auditPackage) {
                 data.cmd += " AuditPackage"
             }
-            if (jTagCmd.isSelected && data.tag.isNotEmpty()) {
+            if (data.tag.isNotEmpty()) {
                 data.cmd += " " + data.tag
             }
-            cmdExec("git", "reset", "--hard", "HEAD", dir = rootPath)
-            writeReplaceFile(config, data)
-            updateConfigFile()
-            cmdExec("git", "add", ".", dir = rootPath)
-            if (cmdExec("git", "status", dir = rootPath).contains("Changes")) {
-                cmdExec("git", "commit", "-m", data.cmd, dir = rootPath)
+            Utils.cmdExec("git", "reset", "--hard", "HEAD", dir = rootPath)
+            writeReplaceFile(data)
+//            updateConfigFile()
+            Utils.cmdExec("git", "add", ".", dir = rootPath)
+            if (Utils.cmdExec("git", "status", dir = rootPath).contains("Changes")) {
+                Utils.cmdExec("git", "commit", "-m", data.cmd, dir = rootPath)
             } else {
-                cmdExec("git", "commit", "--allow-empty", "-m", data.cmd, dir = rootPath)
+                Utils.cmdExec("git", "commit", "--allow-empty", "-m", data.cmd, dir = rootPath)
             }
             if (data.tag.isNotEmpty()) {
                 data.tag =
                     "${selectedPacketCode.capitalize()}-${data.versionName}-${data.versionCode}-${todayDate()}-${data.tag}"
                 // 删除本地和远端tag
-                cmdExec("git", "tag", "-d", data.tag)
-                cmdExec("git", "push", "origin", "--delete", "refs/tags/${data.tag}")
+                Utils.cmdExec("git", "tag", "-d", data.tag)
+                Utils.cmdExec("git", "push", "origin", "--delete", "refs/tags/${data.tag}")
                 // 添加tag
-                cmdExec("git", "tag", data.tag)
+                Utils.cmdExec("git", "tag", data.tag)
             }
             ConfirmationDialog(jRootFrame, "通知", "提交成功，是否push到远端", {
                 Thread {
-                    val currentBranchName = cmdExec("git", "rev-parse", "--abbrev-ref", "HEAD", dir = rootPath)
+                    val currentBranchName = Utils.cmdExec("git", "rev-parse", "--abbrev-ref", "HEAD", dir = rootPath)
                     if (currentBranchName.isNotEmpty() && currentBranchName != "-1") {
                         if (if (data.tag.isNotEmpty()) {
-                            cmdExec("git", "push", "origin", currentBranchName, "--tags", dir = rootPath) != "-1"
-                        } else {
-                            cmdExec("git", "push", "origin", currentBranchName, "--tags", dir = rootPath) != "-1"
-                        }){
+                                Utils.cmdExec(
+                                    "git",
+                                    "push",
+                                    "origin",
+                                    currentBranchName,
+                                    "--tags",
+                                    dir = rootPath
+                                ) != "-1"
+                            } else {
+                                Utils.cmdExec(
+                                    "git",
+                                    "push",
+                                    "origin",
+                                    currentBranchName,
+                                    "--tags",
+                                    dir = rootPath
+                                ) != "-1"
+                            }
+                        ) {
                             ConfirmationDialog(
                                 jRootFrame,
                                 "通知",
@@ -378,51 +373,20 @@ class TestAction : AnAction() {
         }.start()
     }
 
-    private fun cmdExec(vararg command: String, dir: String = rootPath): String {
-        val process = ProcessBuilder(*command)
-            .redirectOutput(ProcessBuilder.Redirect.PIPE)
-            .redirectError(ProcessBuilder.Redirect.PIPE)
-            .directory(File(dir))
-            .start()
-        process.waitFor()
-        val output = StringBuilder()
-        if (process.exitValue() != 0) {
-            BufferedReader(InputStreamReader(process.errorStream)).useLines { lines ->
-                lines.forEach {
-                    output.appendln(it)
-                }
-            }
-            writeLogToFile(
-                "Command '${command.joinToString(" ")}' failed with exit code ${process.exitValue()} ${
-                    output.toString().trimEnd()
-                }"
-            )
-            return "-1"
-        }
-        BufferedReader(InputStreamReader(process.inputStream)).useLines { lines ->
-            lines.forEach {
-                output.appendln(it)
-            }
-        }
-        val result = output.toString().trimEnd()
-        writeLogToFile(result)
-        return result
-    }
-
-    private fun updateConfigFile() {
-        selectedPacket?.apply {
-            if (jUpdateVersion.isSelected) {
-                if (!version.contains(uiData.versionName)) {
-                    version.add(0, uiData.versionName)
-                    version = ArrayList(version.sortedByDescending {
-                        it.split(".").sumOf { it.toInt() }
-                    })
-                    versionCode.add(version.indexOf(uiData.versionName), uiData.versionCode.toInt())
-                }
-            }
-        }
-        writeConfigFile(rootPath, config)
-    }
+    /*  private fun updateConfigFile() {
+          selectedPacket?.apply {
+              if (jUpdateVersion.isSelected) {
+                  if (!version.contains(uiData.versionName)) {
+                      version.add(0, uiData.versionName)
+                      version = ArrayList(version.sortedByDescending {
+                          it.split(".").sumOf { it.toInt() }
+                      })
+                      versionCode.add(version.indexOf(uiData.versionName), uiData.versionCode.toInt())
+                  }
+              }
+          }
+          writeConfigFile(rootPath, config)
+      }*/
 
     private fun isNeedWarningDialog(data: UIData): Boolean {
         if (data.applicationId.isEmpty()) {
@@ -454,78 +418,54 @@ class TestAction : AnAction() {
     }
 
     private fun refreshUI() {
-        jSubmitButton.text = "提交打包请求"
-        jSubmitButton.isEnabled = true
-        selectedPacketCode = jProjectList.selectedItem!!.toString()
-        println(selectedPacketCode)
-        selectedPacket = config.packet[selectedPacketCode]
-        selectedPacket?.apply {
-            jProjectTip.text = config.tip
-            jProjectName.text = "项目名称：$name"
-            jAppId.text = appId
-            var historyVersion = version.toString()
+        Utils.refreshData(jProjectList.selectedItem!!.toString())
+        SwingUtilities.invokeLater {
+            jSubmitButton.text = "提交打包请求"
+            jSubmitButton.isEnabled = true
+            selectedPacketCode = jProjectList.selectedItem!!.toString()
+            println(selectedPacketCode)
+//            jProjectTip.text = config.tip
+            jProjectName.text = "项目名称：${Utils.appName}"
+            jAppId.text = Utils.appId
+            jVersionCode.text = Utils.versionCode
+            var historyVersion = Utils.versions.toString()
             historyVersion = historyVersion.substring(1, historyVersion.length - 1)
             jHistoryVersion.text =
                 if (historyVersion.contains(",")) historyVersion.replace(", ", "\n") else historyVersion
             SwingUtilities.invokeLater {
                 jHistoryScrollPane.verticalScrollBar.value = 0
             }
-            if (version.isNotEmpty()) jVersion.text = version[0]
-            if (versionCode.isNotEmpty()) jVersionCode.text = versionCode[0].toString()
-            jBuildProjectCmd.text = cmd
+            if (Utils.versions.isNotEmpty()) jVersion.text = Utils.versions[0]
+            jBuildProjectCmd.text = "[Build_${selectedPacketCode.capitalize()}]"
         }
     }
 
-    private fun writeReplaceFile(config: PackageConfig, data: UIData) {
-        val buildConfigPath = "$rootPath/${config.path.buildConfig}"
-        val isWritePlist = config.path.plist.isNotEmpty()
-        val isWriteBuildConfig = config.path.buildConfig.isNotEmpty()
-
+    private fun writeReplaceFile(data: UIData) {
+        val buildConfigPath = Utils.buildGradlePath
+        val yamlPath = "${Utils.flavorPrefixPath}/${jProjectList.selectedItem!!}/assets/config.yaml"
+        Utils.writeLogToFile("Start WriteReplaceFile buildConfigPath:$buildConfigPath, yamlPath:$yamlPath")
         // 修改build文件
-        config.packet[selectedPacketCode]?.let {
-            if (isWritePlist) {
-                val plistPath = "$rootPath/${config.path.plist.replace("flavor", selectedPacketCode)}"
-                replaceFile(
-                    plistPath,
-                    it.regex.plistUrl.ifEmpty {
-                        config.regex.plistUrl.ifEmpty {
-                            PLIST_URL_REGEX
-                        }.replace("flavor", selectedPacketCode)
-                    },
-                    "${data.versionName}-${data.versionCode}"
-                )
-            }
-            if (isWriteBuildConfig) {
-                replaceFile(
-                    buildConfigPath,
-                    it.regex.versionCode.ifEmpty {
-                        config.regex.versionCode.ifEmpty {
-                            VERSION_CODE_REGEX
-                        }.replace("flavor", selectedPacketCode)
-                    },
-                    data.versionCode
-                )
-                replaceFile(
-                    buildConfigPath,
-                    it.regex.versionName.ifEmpty {
-                        config.regex.versionName.ifEmpty {
-                            VERSION_NAME_REGEX
-                        }.replace("flavor", selectedPacketCode)
-                    },
-                    data.versionName
-                )
-                replaceFile(
-                    buildConfigPath,
-                    it.regex.applicationId.ifEmpty {
-                        config.regex.applicationId.ifEmpty {
-                            APPLICATION_ID_REGEX
-                        }.replace("flavor", selectedPacketCode)
-                    },
-                    data.applicationId
-                )
-            }
-        }
-        writeLogToFile("修改完成")
+        replaceFile(
+            yamlPath,
+            PLIST_URL_REGEX,
+            "${data.versionName}-${data.versionCode}"
+        )
+        replaceFile(
+            buildConfigPath,
+            VERSION_CODE_REGEX.replace("flavor", selectedPacketCode),
+            data.versionCode
+        )
+        replaceFile(
+            buildConfigPath,
+            VERSION_NAME_REGEX.replace("flavor", selectedPacketCode),
+            data.versionName
+        )
+//        replaceFile(
+//            buildConfigPath,
+//            APPLICATION_ID_REGEX.replace("flavor", selectedPacketCode),
+//            data.applicationId
+//        )
+        Utils.writeLogToFile("修改完成")
     }
 
     private fun replaceFile(path: String, regexStr: String, newValue: String) {
@@ -537,39 +477,7 @@ class TestAction : AnAction() {
             content = content.replaceFirst(regex, newValue)
             gradleFile.writeText(content)
         } catch (e: Exception) {
-            writeLogToFile(e.message.toString())
+            Utils.writeLogToFile(e.message.toString())
         }
     }
-
-    private fun readConfigFile(path: String): PackageConfig {
-        val realPath = "$path/$CONFIG_NAME"
-        val gson = Gson()
-        val file = File(realPath)
-        val jsonString = file.readText()
-        val packageConfig = gson.fromJson(jsonString, PackageConfig::class.java)
-        println(packageConfig)
-        return packageConfig
-    }
-
-    private fun writeConfigFile(path: String, config: PackageConfig) {
-        val realPath = "$path/$CONFIG_NAME"
-        val content = Gson().toJson(config)
-        val file = FileWriter(realPath)
-        val writer = BufferedWriter(file)
-        writer.write(content)
-        writer.close()
-    }
-
-
-    private fun writeLogToFile(message: String) {
-        val realPath = "$rootPath/$CONFIG_LOG"
-        val file = File(realPath)
-        if (file.exists()) {
-            val readText = file.readText()
-            val writer = BufferedWriter(FileWriter(realPath))
-            writer.write(readText + "\n" + message)
-            writer.close()
-        }
-    }
-
 }
