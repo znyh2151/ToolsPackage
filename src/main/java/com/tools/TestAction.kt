@@ -4,6 +4,7 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.util.ui.JBUI
 import com.tools.bean.*
+import com.tools.ui.HomePage
 import com.tools.utils.ConfirmationDialog
 import com.tools.utils.Utils
 import com.tools.utils.getVersionDiff
@@ -21,6 +22,7 @@ class TestAction : AnAction() {
     private lateinit var jProjectList: JComboBox<String>
     private lateinit var jProjectName: JLabel
     private lateinit var jSubmitButton: JButton
+    private lateinit var jbInitPath: JButton
     private lateinit var jProjectTip: JTextArea
     private lateinit var jHistoryVersion: JTextArea
     private lateinit var jHistoryScrollPane: JScrollPane
@@ -35,12 +37,63 @@ class TestAction : AnAction() {
     private lateinit var jStoreIcon: JCheckBox
     private lateinit var jAuditPackage: JCheckBox
     private lateinit var jRootFrame: JFrame
-
+    private lateinit var jtPlistPath: JComboBox<String>
+    private lateinit var jtBuildPath: JComboBox<String>
+    private lateinit var uiHome: HomePage
     override fun actionPerformed(e: AnActionEvent) {
         rootPath = e.project?.basePath!!
         Utils.initPath(rootPath)
         Utils.writeLogToFile("当前路径$rootPath")
-        initView()
+//        initView()
+        initView2()
+    }
+
+    private fun initView2() {
+        jRootFrame = JFrame("打包界面")
+        uiHome = HomePage().apply {
+            jRootFrame.contentPane = root
+            this@TestAction.jProjectList = jProjectList
+            this@TestAction.jProjectName = jProjectName
+            this@TestAction.jSubmitButton = jSubmitButton
+            this@TestAction.jHistoryVersion = jHistoryVersion
+            this@TestAction.jHistoryScrollPane = jHistoryScrollPane
+            this@TestAction.jVersion = jVersion
+            this@TestAction.jVersionCode = jVersionCode
+            this@TestAction.jBuildProjectCmd = jBuildProjectCmd
+            this@TestAction.jTag = jTag
+            this@TestAction.jAppId = jAppId
+            this@TestAction.jGT = jGT
+            this@TestAction.jStoreCode = jStoreCode
+            this@TestAction.jStoreName = jStoreName
+            this@TestAction.jStoreIcon = jStoreIcon
+            this@TestAction.jAuditPackage = jAuditPackage
+            this@TestAction.jtPlistPath = jtPlistPath
+            this@TestAction.jtBuildPath = jtBuildPath
+            this@TestAction.jbInitPath = jbInitPath
+        }
+        jtPlistPath.model = DefaultComboBoxModel(Utils.findFlavorPrefixPath().toTypedArray())
+        jtBuildPath.model = DefaultComboBoxModel(Utils.findBuildGradlePrefixPath().toTypedArray())
+        jProjectList.addActionListener { refreshUI() }
+        jbInitPath.text = "修改路径"
+        jbInitPath.addActionListener {
+            Utils.flavorPrefixPath = jtPlistPath.selectedItem!!.toString()
+            Utils.buildGradlePath = jtBuildPath.selectedItem!!.toString()
+            jProjectList.model = DefaultComboBoxModel(Utils.flavors.toTypedArray())
+            Utils.refreshData(jProjectList.selectedItem!!.toString())
+            refreshUI()
+        }
+        jSubmitButton.addActionListener { submitBuild() }
+        jRootFrame.apply {
+            setSize(750, 900)
+            setLocationRelativeTo(null)
+            defaultCloseOperation = JFrame.HIDE_ON_CLOSE
+            isVisible = true
+        }
+        Thread {
+            jProjectList.model = DefaultComboBoxModel(Utils.flavors.toTypedArray())
+            Utils.refreshData(jProjectList.selectedItem!!.toString())
+            refreshUI()
+        }.start()
     }
 
     private fun initView() {
@@ -61,7 +114,7 @@ class TestAction : AnAction() {
             fill = GridBagConstraints.HORIZONTAL
         }
         panel.add(jProjectList, gbcComboBox)
-        jProjectName = JLabel("项目名称：短剧1")
+        jProjectName = JLabel("项目名称：加载中...")
         val gbcLabel1 = GridBagConstraints().apply {
             gridx = 0
             gridy = 1
@@ -422,6 +475,9 @@ class TestAction : AnAction() {
         SwingUtilities.invokeLater {
             jSubmitButton.text = "提交打包请求"
             jSubmitButton.isEnabled = true
+            uiHome.jLibAd.text = Utils.libAds
+            uiHome.jLibFramework.text = Utils.libAppFramework
+            uiHome.jLibSecurity.text = Utils.libSecurity
             selectedPacketCode = jProjectList.selectedItem!!.toString()
             println(selectedPacketCode)
 //            jProjectTip.text = config.tip

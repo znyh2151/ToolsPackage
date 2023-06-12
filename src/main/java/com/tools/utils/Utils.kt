@@ -21,7 +21,9 @@ object Utils {
     var appId = ""
     var appName = ""
     var versionCode = ""
-
+    var libSecurity = ""
+    var libAppFramework = ""
+    var libAds = ""
 
     fun initPath(rootPath: String) {
         this.rootPath = rootPath
@@ -35,54 +37,58 @@ object Utils {
 
     fun refreshData(flavor: String) {
         if (flavorPrefixPath.isEmpty()) {
-            flavorPrefixPath = findFlavorPrefixPath()
+            flavorPrefixPath = findFlavorPrefixPath()[0]
             println(flavorPrefixPath)
         }
         if (buildGradlePath.isEmpty()) {
-            buildGradlePath = findBuildGradlePrefixPath()
+            buildGradlePath = findBuildGradlePrefixPath()[0]
             println(buildGradlePath)
         }
         appName = getAppName(flavor)
         appId = getAppId(flavor)
         versions = getVersion(flavor)
         versionCode = getAppVersionCode(flavor)
+        getAppLibVersion(flavor)
         println("name: $appName, id: $appId,versionCode: $versionCode, versions: $versions")
     }
 
-    private fun findFlavorPrefixPath(): String {
+    fun findFlavorPrefixPath(): List<String> {
         val targetFileName = "main"
         val mainPath = cmdExec("find", rootPath, "-name", targetFileName, "-maxdepth", "4").split("\n")
             .filter { !it.contains("libs") }
-        if (mainPath.size != 1) {
-            throw RuntimeException("获取 main file path 路径错误")
-        } else {
-            val result = mainPath[0].substring(0, mainPath[0].length - targetFileName.length - 1)
+        val result = mutableListOf<String>()
+        for (s in mainPath) {
+            result.add(s.substring(0, s.length - targetFileName.length - 1))
             writeLogToFile("findFlavorPrefixPath: $result")
-            return result
         }
+        if (result.isEmpty()) {
+            writeLogToFile("findFlavorPrefixPath: size = 0")
+        }
+        return result
     }
 
-    private fun findBuildGradlePrefixPath(): String {
+    fun findBuildGradlePrefixPath(): List<String> {
         val targetFileName = "build.gradle"
-        var buildGradlePath = cmdExec("find", rootPath, "-name", targetFileName, "-maxdepth", "2").split("\n")
+        val buildGradlePath = cmdExec("find", rootPath, "-name", targetFileName, "-maxdepth", "2").split("\n")
             .filter { !it.contains("libs") }
         if (buildGradlePath.isEmpty()) {
             throw RuntimeException("获取 build.gradle file path 路径错误")
         }
         if (buildGradlePath.size != 1) {
-            buildGradlePath = buildGradlePath.filter { it.contains("app") }
-            if (buildGradlePath.isEmpty()) {
-                throw RuntimeException("获取 build.gradle file path 路径错误")
+            val list = buildGradlePath.filter { it.contains("app") }
+            if (list.isEmpty()) {
+                return buildGradlePath
             }
+            writeLogToFile("findBuildGradlePrefixPath $list")
+            return list
         }
-        val result = buildGradlePath[0]
-        writeLogToFile("findBuildGradlePrefixPath $result")
-        return result
+        writeLogToFile("findBuildGradlePrefixPath $buildGradlePath")
+        return buildGradlePath
     }
 
     private fun getAllFlavors(): List<String> {
-        flavorPrefixPath = findFlavorPrefixPath()
-        buildGradlePath = findBuildGradlePrefixPath()
+        flavorPrefixPath = flavorPrefixPath.ifEmpty { findFlavorPrefixPath()[0] }
+        buildGradlePath = buildGradlePath.ifEmpty { findBuildGradlePrefixPath()[0] }
         cmdExec("git", "fetch", "origin", "--tags", "-f")
         val mainSrcPath = File(flavorPrefixPath)
         if (!mainSrcPath.exists() || !mainSrcPath.isDirectory) {
@@ -162,6 +168,29 @@ object Utils {
         val versionCode = regex.find(content)?.groupValues?.get(1) ?: ""
         writeLogToFile("getAppVersionCode: $versionCode")
         return versionCode
+    }
+
+    private fun getAppLibVersion(flavor: String) {
+        val buildFile = File(buildGradlePath)
+        val content = buildFile.readText()
+        val regex = "['\"]cn.ihandy.appframework:libSecurity.*['\"]".toRegex()
+        val regex2 = "['\"]cn.appcloudbox.ads:${flavor}_.*['\"]".toRegex()
+        val regex3 = "['\"]cn.ihandy.appframework:libAppframework.*['\"]".toRegex()
+        regex.find(content)?.let {
+            val result = it.groupValues[0]
+            writeLogToFile("getAppLibVersion$result")
+            libSecurity = result.substring(1, result.length - 1)
+        }
+        regex2.find(content)?.let {
+            val result = it.groupValues[0]
+            writeLogToFile("getAppLibVersion$result")
+            libAds = result.substring(1, result.length - 1)
+        }
+        regex3.find(content)?.let {
+            val result = it.groupValues[0]
+            writeLogToFile("getAppLibVersion$result")
+            libAppFramework = result.substring(1, result.length - 1)
+        }
     }
 
     private fun getVersion(flavor: String): List<String> {
