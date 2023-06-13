@@ -28,4 +28,6 @@ public class HomePage {
     public JTextArea jLibChange;
     public JTextArea jTip;
     public JCheckBox jLibChangeSwitch;
+    public JButton jToken;
+    public JTextField jTokenInput;
 }

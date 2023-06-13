@@ -1,6 +1,7 @@
 package com.tools.utils
 
 import com.google.gson.Gson
+import com.intellij.ide.util.PropertiesComponent
 import com.tools.bean.ConfigFile
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -10,12 +11,25 @@ import java.nio.charset.StandardCharsets
 import java.util.*
 
 object ConfigUtils {
+    const val TOKEN_KEY = "TOOLS_PACKET_TOKEN_KEY"
     var config = ConfigFile()
+    var token: String = ""
+        get() = field.ifEmpty { PropertiesComponent.getInstance().getValue(TOKEN_KEY, "") }
 
     fun getConfigFile() {
         val client = OkHttpClient()
+        if (token.isEmpty()) {
+            token = System.getenv("TOOLS_PACKAGE_TOKEN")
+        }
+        if (token.isEmpty()) {
+            Utils.writeLogToFile("网络获取文件失败,token is null")
+            println(config)
+            return
+        }
+        val url =
+            "https://git.atcloudbox.com/api/v4/projects/734/repository/files/tools%2Ftools_package_config.json?private_token=${token}&ref=develop"
         val request: Request = Request.Builder()
-            .url("https://git.atcloudbox.com/api/v4/projects/734/repository/files/tools%2Ftools_package_config.json?private_token=${System.getenv("TOOLS_PACKAGE_TOKEN")}&ref=develop")
+            .url(url)
             .build()
         val response = client.newCall(request).execute()
         if (response.isSuccessful) {
@@ -28,7 +42,8 @@ object ConfigUtils {
             config.netWork = true
             println(config)
         } else {
-            Utils.writeLogToFile("网络获取文件失败")
+            Utils.writeLogToFile("网络获取文件失败,${response.code},${response.message}")
+            Utils.writeLogToFile("网络获取文件失败,${url}")
             println(config)
         }
     }

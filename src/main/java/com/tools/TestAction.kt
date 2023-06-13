@@ -1,5 +1,6 @@
 package com.tools
 
+import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.util.ui.JBUI
@@ -68,6 +69,11 @@ class TestAction : AnAction() {
             this@TestAction.jtBuildPath = jtBuildPath
             this@TestAction.jbInitPath = jbInitPath
         }
+        uiHome.jTokenInput.text = ConfigUtils.token
+        uiHome.jToken.addActionListener {
+            PropertiesComponent.getInstance().setValue(ConfigUtils.TOKEN_KEY, uiHome.jTokenInput.text)
+            initData()
+        }
         jtPlistPath.model = DefaultComboBoxModel(Utils.findFlavorPrefixPath().toTypedArray())
         jtBuildPath.model = DefaultComboBoxModel(Utils.findBuildGradlePrefixPath().toTypedArray())
         jProjectList.addActionListener { refreshUI() }
@@ -86,6 +92,10 @@ class TestAction : AnAction() {
             defaultCloseOperation = JFrame.HIDE_ON_CLOSE
             isVisible = true
         }
+        initData()
+    }
+
+    private fun initData() {
         Thread {
             ConfigUtils.getConfigFile()
             jProjectList.model = DefaultComboBoxModel(Utils.flavors.toTypedArray())
