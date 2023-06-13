@@ -5,10 +5,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.util.ui.JBUI
 import com.tools.bean.*
 import com.tools.ui.HomePage
-import com.tools.utils.ConfirmationDialog
-import com.tools.utils.Utils
-import com.tools.utils.getVersionDiff
-import com.tools.utils.todayDate
+import com.tools.utils.*
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
 import java.io.*
@@ -84,12 +81,13 @@ class TestAction : AnAction() {
         }
         jSubmitButton.addActionListener { submitBuild() }
         jRootFrame.apply {
-            setSize(750, 900)
+            setSize(1100, 600)
             setLocationRelativeTo(null)
             defaultCloseOperation = JFrame.HIDE_ON_CLOSE
             isVisible = true
         }
         Thread {
+            ConfigUtils.getConfigFile()
             jProjectList.model = DefaultComboBoxModel(Utils.flavors.toTypedArray())
             Utils.refreshData(jProjectList.selectedItem!!.toString())
             refreshUI()
@@ -471,6 +469,7 @@ class TestAction : AnAction() {
     }
 
     private fun refreshUI() {
+        ConfigUtils.refreshReplaceLib()
         Utils.refreshData(jProjectList.selectedItem!!.toString())
         SwingUtilities.invokeLater {
             jSubmitButton.text = "提交打包请求"
@@ -493,6 +492,22 @@ class TestAction : AnAction() {
             }
             if (Utils.versions.isNotEmpty()) jVersion.text = Utils.versions[0]
             jBuildProjectCmd.text = "[Build_${selectedPacketCode.capitalize()}]"
+            uiHome.jTip.text = ConfigUtils.getTip()
+            val libChangList = ConfigUtils.config.libReplace.filter { it.isEnable() }
+            if (libChangList.isNotEmpty()) {
+                var jLibChangeText = "原版本：\n"
+                for (lib in libChangList) {
+                    jLibChangeText += lib.oldValue + "\n"
+                }
+                jLibChangeText += "新版本：\n"
+                for (lib in libChangList) {
+                    jLibChangeText += lib.newValue + "\n"
+                }
+                uiHome.jLibChange.text = jLibChangeText
+            } else {
+                uiHome.jLibChange.text = "无需变更"
+            }
+
         }
     }
 
@@ -516,6 +531,13 @@ class TestAction : AnAction() {
             VERSION_NAME_REGEX.replace("flavor", selectedPacketCode),
             data.versionName
         )
+       if (uiHome.jLibChangeSwitch.isSelected) {
+           for (lib in ConfigUtils.config.libReplace) {
+               if (lib.isEnable()) {
+                   replaceFile(buildConfigPath, lib.regex, "\"${lib.newValue}\"")
+               }
+           }
+       }
 //        replaceFile(
 //            buildConfigPath,
 //            APPLICATION_ID_REGEX.replace("flavor", selectedPacketCode),

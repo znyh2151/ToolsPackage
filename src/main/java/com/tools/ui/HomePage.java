@@ -25,4 +25,7 @@ public class HomePage {
     public JTextField jLibAd;
     public JTextField jLibSecurity;
     public JTextField jLibFramework;
+    public JTextArea jLibChange;
+    public JTextArea jTip;
+    public JCheckBox jLibChangeSwitch;
 }

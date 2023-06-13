@@ -173,9 +173,9 @@ object Utils {
     private fun getAppLibVersion(flavor: String) {
         val buildFile = File(buildGradlePath)
         val content = buildFile.readText()
-        val regex = "['\"]cn.ihandy.appframework:libSecurity.*['\"]".toRegex()
+        val regex = "['\"]cn.*.appframework:libSecurity.*['\"]".toRegex()
         val regex2 = "['\"]cn.appcloudbox.ads:${flavor}_.*['\"]".toRegex()
-        val regex3 = "['\"]cn.ihandy.appframework:libAppframework.*['\"]".toRegex()
+        val regex3 = "['\"]cn.*.appframework:libAppframework.*['\"]".toRegex()
         regex.find(content)?.let {
             val result = it.groupValues[0]
             writeLogToFile("getAppLibVersion$result")
