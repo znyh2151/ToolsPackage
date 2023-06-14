@@ -1,6 +1,8 @@
 package com.tools.utils
 
+import com.tools.bean.APPLICATION_ID_REGEX
 import com.tools.bean.CONFIG_LOG
+import com.tools.bean.VERSION_CODE_REGEX
 import java.io.*
 import java.lang.StringBuilder
 
@@ -68,8 +70,9 @@ object Utils {
     }
 
     fun findBuildGradlePrefixPath(): List<String> {
-        val targetFileName = "build.gradle"
-        val buildGradlePath = cmdExec("find", rootPath, "-name", targetFileName, "-maxdepth", "2").split("\n")
+        val buildGradlePath = cmdExec("find", rootPath, "-name", "build.gradle", "-maxdepth", "2").split("\n")
+            .filter { !it.contains("libs") }.toMutableList()
+        buildGradlePath += cmdExec("find", rootPath, "-name", "build.gradle.kts", "-maxdepth", "2").split("\n")
             .filter { !it.contains("libs") }
         if (buildGradlePath.isEmpty()) {
             throw RuntimeException("获取 build.gradle file path 路径错误")
@@ -152,8 +155,8 @@ object Utils {
         val content = buildFile.readText()
 
         // 正则表达式，匹配 flavor 下的 applicationId
-        val regex = "${flavor}[^{]*?\\{[^}]*?applicationId\\s+\"([a-zA-Z.]+)\"".toRegex()
-        val appId = regex.find(content)?.groupValues?.get(1) ?: ""
+        val regex = APPLICATION_ID_REGEX.replace("flavor", flavor).toRegex()
+        val appId = regex.find(content)?.groupValues?.get(0) ?: ""
         writeLogToFile("getAppId: $appId")
         return appId
     }
@@ -164,8 +167,8 @@ object Utils {
         val content = buildFile.readText()
 
         // 正则表达式，匹配 flavor 下的 applicationId
-        val regex = "${flavor}[^{]*?\\{[^}]*?versionCode\\s+(\\d+)".toRegex()
-        val versionCode = regex.find(content)?.groupValues?.get(1) ?: ""
+        val regex = VERSION_CODE_REGEX.replace("flavor", flavor).toRegex()
+        val versionCode = regex.find(content)?.groupValues?.get(0) ?: ""
         writeLogToFile("getAppVersionCode: $versionCode")
         return versionCode
     }

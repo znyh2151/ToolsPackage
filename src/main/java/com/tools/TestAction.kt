@@ -87,7 +87,7 @@ class TestAction : AnAction() {
         }
         jSubmitButton.addActionListener { submitBuild() }
         jRootFrame.apply {
-            setSize(1100, 600)
+            setSize(1200, 600)
             setLocationRelativeTo(null)
             defaultCloseOperation = JFrame.HIDE_ON_CLOSE
             isVisible = true
