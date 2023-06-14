@@ -194,7 +194,7 @@ object Utils {
     }
 
     private fun getVersion(flavor: String): List<String> {
-        val allTags = cmdExec("git", "tag", "--sort=-creatordate")
+        val allTags = cmdExec("git", "tag", "--sort=-creatordate", "--merged")
         val tags = allTags.split("\n").filter { it.startsWith("${flavor.capitalize()}-", ignoreCase = true) }
         val tagList = mutableListOf<String>()
         for (tag in tags) {
