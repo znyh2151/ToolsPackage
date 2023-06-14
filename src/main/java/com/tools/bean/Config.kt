@@ -2,7 +2,7 @@ package com.tools.bean
 
 
 const val CONFIG_NAME = "PackageToolsConfig.json"
-const val CONFIG_LOG = "PackageToolsConfigLog.txt"
+const val CONFIG_LOG = "PackageTools.log"
 const val VERSION_CODE_REGEX = "(?<=flavor[\\s\\S]{0,10}\\{[\\s\\S]{0,1000}?versionCode[\\s=]{0,10})\\d+(?=\\s*)"
 const val VERSION_NAME_REGEX = "(?<=flavor[\\s\\S]{0,10}\\{[\\s\\S]{0,1000}?versionName[\\s=]{0,10}\").*?(?=\")"
 const val APPLICATION_ID_REGEX = "(?<=flavor[\\s\\S]{0,10}\\{[\\s\\S]{0,1000}?applicationId[\\s=]{0,10}\").*?(?=\")"

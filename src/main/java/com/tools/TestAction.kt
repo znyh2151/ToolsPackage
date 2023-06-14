@@ -41,7 +41,7 @@ class TestAction : AnAction() {
     override fun actionPerformed(e: AnActionEvent) {
         rootPath = e.project?.basePath!!
         Utils.initPath(rootPath)
-        Utils.writeLogToFile("当前路径$rootPath")
+        Utils.writeLogToFile("当前路径$rootPath", true)
 //        initView()
         initView2()
     }
@@ -363,7 +363,7 @@ class TestAction : AnAction() {
             if (data.tag.isNotEmpty()) {
                 data.cmd += " " + data.tag
             }
-            Utils.cmdExec("git", "reset", "--hard", "HEAD", dir = rootPath)
+//            Utils.cmdExec("git", "reset", "--hard", "HEAD", dir = rootPath)
             writeReplaceFile(data)
 //            updateConfigFile()
             Utils.cmdExec("git", "add", ".", dir = rootPath)

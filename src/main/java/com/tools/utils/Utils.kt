@@ -5,6 +5,10 @@ import com.tools.bean.CONFIG_LOG
 import com.tools.bean.VERSION_CODE_REGEX
 import java.io.*
 import java.lang.StringBuilder
+import java.text.SimpleDateFormat
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.*
 
 const val APP_NAME_REGEX = "<string\\s+name=\"app_name\">([^<]*)</string>"
 
@@ -248,14 +252,31 @@ object Utils {
         return result
     }
 
-    fun writeLogToFile(message: String) {
+    fun writeLogToFile(message: String, init: Boolean = false) {
         val realPath = "$rootPath/$CONFIG_LOG"
         val file = File(realPath)
-        if (file.exists()) {
-            val readText = file.readText()
-            val writer = BufferedWriter(FileWriter(realPath))
-            writer.write(readText + "\n" + message)
-            writer.close()
+        if (!file.exists()) {
+            file.createNewFile()
+            var gitignore = cmdExec("find", rootPath, "-name", ".gitignore", "-maxdepth", "1").split("\n")
+            if (gitignore.isEmpty()) {
+                gitignore = cmdExec("find", rootPath, "-name", ".gitignore", "-maxdepth", "2").split("\n")
+            }
+            if (gitignore.isNotEmpty()) {
+                val gitignoreFile = File(gitignore[0])
+                if (gitignoreFile.exists()) {
+                    val readText = gitignoreFile.readText()
+                    val writer = BufferedWriter(FileWriter(gitignore[0]))
+                    writer.write("${readText}\n${gitignore[0].substring(rootPath.length,gitignore[0].length - ".gitignore".length)}$CONFIG_LOG")
+                    writer.close()
+                }
+            }
         }
+        val size = file.length() / (1024 * 1024)
+        val readText = file.readText()
+        val formatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault())
+        val time = formatter.format(Date())
+        val writer = BufferedWriter(FileWriter(realPath))
+        writer.write(if (init && size >= 5) "" else readText + "\n${time}--> " + message)
+        writer.close()
     }
 }
