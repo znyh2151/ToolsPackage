@@ -265,9 +265,12 @@ object Utils {
                 val gitignoreFile = File(gitignore[0])
                 if (gitignoreFile.exists()) {
                     val readText = gitignoreFile.readText()
-                    val writer = BufferedWriter(FileWriter(gitignore[0]))
-                    writer.write("${readText}\n${gitignore[0].substring(rootPath.length,gitignore[0].length - ".gitignore".length)}$CONFIG_LOG")
-                    writer.close()
+                    val insertContext = gitignore[0].substring(rootPath.length,gitignore[0].length - ".gitignore".length) + CONFIG_LOG
+                    if(!readText.contains(insertContext)) {
+                        val writer = BufferedWriter(FileWriter(gitignore[0]))
+                        writer.write("${readText}\n${insertContext}")
+                        writer.close()
+                    }
                 }
             }
         }
