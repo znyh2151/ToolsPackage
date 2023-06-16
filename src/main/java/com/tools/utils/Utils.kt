@@ -282,4 +282,28 @@ object Utils {
         writer.write(if (init && size >= 5) "" else readText + "\n${time}--> " + message)
         writer.close()
     }
+
+    fun checkLogFileInGitignore() {
+        val realPath = "$rootPath/$CONFIG_LOG"
+        val file = File(realPath)
+        if (file.exists()) {
+            var gitignore = cmdExec("find", rootPath, "-name", ".gitignore", "-maxdepth", "1").split("\n")
+            if (gitignore.isEmpty()) {
+                gitignore = cmdExec("find", rootPath, "-name", ".gitignore", "-maxdepth", "2").split("\n")
+            }
+            if (gitignore.isNotEmpty()) {
+                val gitignoreFile = File(gitignore[0])
+                if (gitignoreFile.exists()) {
+                    val readText = gitignoreFile.readText()
+                    val insertContext = gitignore[0].substring(rootPath.length,gitignore[0].length - ".gitignore".length) + CONFIG_LOG
+                    if(!readText.contains(insertContext)) {
+                        val writer = BufferedWriter(FileWriter(gitignore[0]))
+                        writer.write("${readText}\n${insertContext}")
+                        writer.close()
+                    }
+                }
+            }
+        }
+    }
+
 }

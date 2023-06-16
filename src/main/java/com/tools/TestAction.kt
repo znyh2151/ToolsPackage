@@ -366,6 +366,7 @@ class TestAction : AnAction() {
 //            Utils.cmdExec("git", "reset", "--hard", "HEAD", dir = rootPath)
             writeReplaceFile(data)
 //            updateConfigFile()
+            Utils.checkLogFileInGitignore()
             Utils.cmdExec("git", "add", ".", dir = rootPath)
             if (Utils.cmdExec("git", "status", dir = rootPath).contains("Changes")) {
                 Utils.cmdExec("git", "commit", "-m", data.cmd, dir = rootPath)
