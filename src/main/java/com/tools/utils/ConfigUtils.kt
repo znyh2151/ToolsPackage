@@ -27,7 +27,7 @@ object ConfigUtils {
             return
         }
         val url =
-            "https://git.atcloudbox.com/api/v4/projects/734/repository/files/tools%2Ftools_package_config.json?private_token=${token}&ref=develop"
+            "https://git.atcloudbox.com/api/v4/projects/734/repository/files/tools%2Ftools_package_config.json?private_token=${token}&ref=file"
         val request: Request = Request.Builder()
             .url(url)
             .build()
