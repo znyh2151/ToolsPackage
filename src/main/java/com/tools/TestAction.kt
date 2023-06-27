@@ -35,14 +35,14 @@ class TestAction : AnAction() {
     private lateinit var jStoreIcon: JCheckBox
     private lateinit var jAuditPackage: JCheckBox
     private lateinit var jRootFrame: JFrame
-    private lateinit var jtPlistPath: JComboBox<String>
-    private lateinit var jtBuildPath: JComboBox<String>
+    private lateinit var jtPlistPath: JTextField
+    private lateinit var jtBuildPath: JTextField
     private lateinit var uiHome: HomePage
     override fun actionPerformed(e: AnActionEvent) {
         rootPath = e.project?.basePath!!
         Utils.initPath(rootPath)
         Utils.writeLogToFile("当前路径$rootPath", true)
-//        initView()
+        Utils.initSystemPath()
         initView2()
     }
 
@@ -74,20 +74,20 @@ class TestAction : AnAction() {
             PropertiesComponent.getInstance().setValue(ConfigUtils.TOKEN_KEY, uiHome.jTokenInput.text)
             initData()
         }
-        jtPlistPath.model = DefaultComboBoxModel(Utils.findFlavorPrefixPath().toTypedArray())
-        jtBuildPath.model = DefaultComboBoxModel(Utils.findBuildGradlePrefixPath().toTypedArray())
+        uiHome.jtPlistPath.text = Utils.flavorPrefixPath.ifEmpty { Utils.findFlavorPrefixPath()[0] }
+        uiHome.jtBuildPath.text = Utils.buildGradlePath.ifEmpty {  Utils.findBuildGradlePrefixPath()[0] }
         jProjectList.addActionListener { refreshUI() }
         jbInitPath.text = "修改路径"
         jbInitPath.addActionListener {
-            Utils.flavorPrefixPath = jtPlistPath.selectedItem!!.toString()
-            Utils.buildGradlePath = jtBuildPath.selectedItem!!.toString()
+            Utils.flavorPrefixPath = uiHome.jtPlistPath.text
+            Utils.buildGradlePath = uiHome.jtBuildPath.text
             jProjectList.model = DefaultComboBoxModel(Utils.flavors.toTypedArray())
             Utils.refreshData(jProjectList.selectedItem!!.toString())
             refreshUI()
         }
         jSubmitButton.addActionListener { submitBuild() }
         jRootFrame.apply {
-            setSize(1200, 600)
+            setSize(1800, 1000)
             setLocationRelativeTo(null)
             defaultCloseOperation = JFrame.HIDE_ON_CLOSE
             isVisible = true
@@ -344,7 +344,9 @@ class TestAction : AnAction() {
         jSubmitButton.isEnabled = false
         jSubmitButton.repaint()
         Thread {
-            data.cmd += "(${data.versionName}-${data.versionCode})"
+            if (data.cmd.contains("Build")) {
+                data.cmd += "(${data.versionName}-${data.versionCode})"
+            }
             if (data.gt) {
                 data.cmd += " GT"
             }
@@ -363,7 +365,7 @@ class TestAction : AnAction() {
             if (data.tag.isNotEmpty()) {
                 data.cmd += " " + data.tag
             }
-//            Utils.cmdExec("git", "reset", "--hard", "HEAD", dir = rootPath)
+            Utils.cmdExec("git", "reset", "--hard", "HEAD", dir = rootPath)
             writeReplaceFile(data)
 //            updateConfigFile()
             Utils.checkLogFileInGitignore()
@@ -483,6 +485,8 @@ class TestAction : AnAction() {
         ConfigUtils.refreshReplaceLib()
         Utils.refreshData(jProjectList.selectedItem!!.toString())
         SwingUtilities.invokeLater {
+            uiHome.jtPlistPath.text = Utils.flavorPrefixPath
+            uiHome.jtBuildPath.text = Utils.buildGradlePath
             jSubmitButton.text = "提交打包请求"
             jSubmitButton.isEnabled = true
             uiHome.jLibAd.text = Utils.libAds
@@ -542,13 +546,13 @@ class TestAction : AnAction() {
             VERSION_NAME_REGEX.replace("flavor", selectedPacketCode),
             data.versionName
         )
-       if (uiHome.jLibChangeSwitch.isSelected) {
-           for (lib in ConfigUtils.config.libReplace) {
-               if (lib.isEnable()) {
-                   replaceFile(buildConfigPath, lib.regex, "\"${lib.newValue}\"")
-               }
-           }
-       }
+        if (uiHome.jLibChangeSwitch.isSelected) {
+            for (lib in ConfigUtils.config.libReplace) {
+                if (lib.isEnable()) {
+                    replaceFile(buildConfigPath, lib.regex, "\"${lib.newValue}\"")
+                }
+            }
+        }
 //        replaceFile(
 //            buildConfigPath,
 //            APPLICATION_ID_REGEX.replace("flavor", selectedPacketCode),

@@ -1,21 +1,33 @@
 package com.tools.utils
 
+import com.intellij.ide.util.PropertiesComponent
 import com.tools.bean.APPLICATION_ID_REGEX
 import com.tools.bean.CONFIG_LOG
 import com.tools.bean.VERSION_CODE_REGEX
 import java.io.*
-import java.lang.StringBuilder
 import java.text.SimpleDateFormat
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import java.util.*
+import kotlin.text.StringBuilder
 
 const val APP_NAME_REGEX = "<string\\s+name=\"app_name\">([^<]*)</string>"
 
 object Utils {
+    private val plistPathKey get() = rootPath + "jtPlistPath"
+    private val buildPathKey get() = rootPath + "jtBuildPath"
+
     var rootPath = ""
-    var flavorPrefixPath = ""
-    var buildGradlePath = ""
+    var systemPath = ""
+    var flavorPrefixPath
+        get() = if (rootPath.isEmpty()) "" else PropertiesComponent.getInstance().getValue(plistPathKey, "")
+        set(value) {
+            PropertiesComponent.getInstance().setValue(plistPathKey, value)
+        }
+    var buildGradlePath
+        get() = if (rootPath.isEmpty()) "" else PropertiesComponent.getInstance().getValue(buildPathKey, "")
+        set(value) {
+            PropertiesComponent.getInstance().setValue(buildPathKey, value)
+        }
+
     var versions = emptyList<String>()
     var flavors = emptyList<String>()
         get() {
@@ -33,8 +45,6 @@ object Utils {
 
     fun initPath(rootPath: String) {
         this.rootPath = rootPath
-        flavorPrefixPath = ""
-        buildGradlePath = ""
         versions = emptyList()
         flavors = emptyList()
         println(rootPath)
@@ -201,7 +211,7 @@ object Utils {
     }
 
     private fun getVersion(flavor: String): List<String> {
-        val allTags = cmdExec("git", "tag", "--sort=-creatordate", "--merged")
+        val allTags = cmdExec("git", "tag", "--sort=-creatordate", "--merged", isLog = false)
         val tags = allTags.split("\n").filter { it.startsWith("${flavor.capitalize()}-", ignoreCase = true) }
         val tagList = mutableListOf<String>()
         for (tag in tags) {
@@ -221,12 +231,15 @@ object Utils {
         return versions
     }
 
-    fun cmdExec(vararg command: String, dir: String = rootPath): String {
-        val process = ProcessBuilder(*command)
+    fun cmdExec(vararg command: String, dir: String = rootPath, isLog: Boolean = true): String {
+        val bulder = ProcessBuilder(*command)
             .redirectOutput(ProcessBuilder.Redirect.PIPE)
             .redirectError(ProcessBuilder.Redirect.PIPE)
             .directory(File(dir))
-            .start()
+        if (systemPath.isNotEmpty()) {
+            bulder.environment()["PATH"] = systemPath
+        }
+        val process = bulder.start()
         process.waitFor()
         val output = StringBuilder()
         if (process.exitValue() != 0) {
@@ -248,7 +261,9 @@ object Utils {
             }
         }
         val result = output.toString().trimEnd()
-        writeLogToFile(result)
+        if (isLog) {
+            writeLogToFile(result)
+        }
         return result
     }
 
@@ -265,8 +280,9 @@ object Utils {
                 val gitignoreFile = File(gitignore[0])
                 if (gitignoreFile.exists()) {
                     val readText = gitignoreFile.readText()
-                    val insertContext = gitignore[0].substring(rootPath.length,gitignore[0].length - ".gitignore".length) + CONFIG_LOG
-                    if(!readText.contains(insertContext)) {
+                    val insertContext =
+                        gitignore[0].substring(rootPath.length, gitignore[0].length - ".gitignore".length) + CONFIG_LOG
+                    if (!readText.contains(insertContext)) {
                         val writer = BufferedWriter(FileWriter(gitignore[0]))
                         writer.write("${readText}\n${insertContext}")
                         writer.close()
@@ -295,8 +311,9 @@ object Utils {
                 val gitignoreFile = File(gitignore[0])
                 if (gitignoreFile.exists()) {
                     val readText = gitignoreFile.readText()
-                    val insertContext = gitignore[0].substring(rootPath.length,gitignore[0].length - ".gitignore".length) + CONFIG_LOG
-                    if(!readText.contains(insertContext)) {
+                    val insertContext =
+                        gitignore[0].substring(rootPath.length, gitignore[0].length - ".gitignore".length) + CONFIG_LOG
+                    if (!readText.contains(insertContext)) {
                         val writer = BufferedWriter(FileWriter(gitignore[0]))
                         writer.write("${readText}\n${insertContext}")
                         writer.close()
@@ -306,4 +323,30 @@ object Utils {
         }
     }
 
+    fun initSystemPath() {
+        val home = System.getenv("HOME")
+        val path1 = cmdExec("/bin/sh", "-c", "source /etc/profile && env", isLog = false).split("\n")
+            .find { it.startsWith("PATH") }
+        val path2 = cmdExec("/bin/sh", "-c", "source ${home}/.bash_profile && env", isLog = false).split("\n")
+            .find { it.startsWith("PATH") }
+        val path3 = cmdExec("/bin/sh", "-c", "source ${home}/.zprofile && env", isLog = false).split("\n")
+            .find { it.startsWith("PATH") }
+        val path4 = cmdExec("/bin/sh", "-c", "source ${home}/.profile && env", isLog = false).split("\n")
+            .find { it.startsWith("PATH") }
+        val sb = StringBuilder()
+        path1?.let {
+            sb.append(it.substring(5) + ":")
+        }
+        path2?.let {
+            sb.append(it.substring(5) + ":")
+        }
+        path3?.let {
+            sb.append(it.substring(5) + ":")
+        }
+        path4?.let {
+            sb.append(it.substring(5) + ":")
+        }
+        systemPath = sb.deleteAt(sb.length - 1).toString()
+        writeLogToFile("path : $systemPath")
+    }
 }

@@ -20,8 +20,8 @@ public class HomePage {
     public JButton jSubmitButton;
     public JPanel root;
     public JScrollPane jHistoryScrollPane;
-    public JComboBox<String> jtPlistPath;
-    public JComboBox<String> jtBuildPath;
+    public JTextField jtPlistPath;
+    public JTextField jtBuildPath;
     public JTextField jLibAd;
     public JTextField jLibSecurity;
     public JTextField jLibFramework;

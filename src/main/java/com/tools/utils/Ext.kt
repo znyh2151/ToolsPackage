@@ -51,6 +51,32 @@ fun main() {
     val list = listOf("1.0.1", "2.0.2", "1.3.20")
     val sortedList = sortList(list)
     println(sortedList)
+
+    loadEnv()
+}
+
+fun loadEnv() {
+// 创建一个ProcessBuilder对象，并将UNIX shell作为命令参数传递
+    val builder = ProcessBuilder("/bin/sh", "-c", "source /etc/profile && env")
+// 将环境变量加载到当前环境中
+    builder.environment().putAll(System.getenv())
+
+// 启动进程并等待它完成
+    val process = builder.start()
+    process.waitFor()
+
+// 您可以遍历输出并将其分解为键/值对
+    process.inputStream.bufferedReader().useLines { lines ->
+        lines.forEach { line ->
+            val (key, value) = line.split("=", limit = 2)
+            System.setProperty(key, value)
+            println("key:$key, value:$value")
+        }
+    }
+    val environmentVariables = System.getenv()
+    for ((key, value) in environmentVariables) {
+        println("环境变量：$key=$value")
+    }
 }
 
 fun sortList(list: List<String>): List<String> {
