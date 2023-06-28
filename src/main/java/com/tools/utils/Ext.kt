@@ -1,8 +1,12 @@
 package com.tools.utils
 
 
+import java.awt.BorderLayout
+import java.awt.Dimension
+import java.awt.GridLayout
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import javax.swing.*
 
 
 fun todayDate(): String {
@@ -26,33 +30,37 @@ fun getVersionDiff(version1: String, version2: String): Int {
 }
 
 fun main() {
-//    var text = """
-//    productFlavors {
-//        play1 {
-//            dimension "product"
-//            applicationId "com.play1"
-//            versionCode 1000
-//            versionName "1.0.0"
-//        }
-//        play2 {
-//            dimension "product"
-//            applicationId "com.play2"
-//            versionCode 1002
-//            versionName "1.0.2"
-//        }
-//    }"""
-//    val pattern2 = """(?<=play2\s{0,10}\{[\s\S]{0,1000}?versionCode\s{0,10})\d+(?=\s*)""".toRegex()
-//    val pattern = """(?<=play1\s{0,10}\{[\s\S]{0,1000}?versionName\s{0,10}").*?(?=")""".toRegex()
-//    val newVersionName = "1.0.3" // 替换为你想要的新版本名
-//    var index = 0
-//    val newText = pattern.replaceFirst(text, newVersionName)
-//    println(newText)
+    var text = """
+    flavorInfos="mars44,1.0.0,10000" 
+    reinforcement="true"
+    slackNotification="true"
+    noAdMode="false"
+    """
+    val pattern = """(?<=flavorInfos=").*?(?=")""".toRegex()
+    val newVersionName = "1.0.3" // 替换为你想要的新版本名
+    val newText = pattern.replaceFirst(text, newVersionName)
+    println(newText)
+}
 
-    val list = listOf("1.0.1", "2.0.2", "1.3.20")
-    val sortedList = sortList(list)
-    println(sortedList)
+fun createAndShowGUI(items: List<String>) {
+    val frame = JFrame("Dynamic Item List")
+    frame.defaultCloseOperation = JFrame.EXIT_ON_CLOSE
+    frame.setSize(600, 400)
+    frame.layout = BorderLayout()
 
-    loadEnv()
+    val itemList = JPanel()
+    itemList.layout = GridLayout(0, 6)
+    val scrollPane = JScrollPane(itemList)
+    scrollPane.verticalScrollBarPolicy = JScrollPane.VERTICAL_SCROLLBAR_ALWAYS
+    scrollPane.preferredSize = Dimension(300, 300)
+
+    for (item in items) {
+        val checkBox = JCheckBox(item)
+        itemList.add(checkBox)
+    }
+
+    frame.add(scrollPane, BorderLayout.CENTER)
+    frame.isVisible = true
 }
 
 fun loadEnv() {

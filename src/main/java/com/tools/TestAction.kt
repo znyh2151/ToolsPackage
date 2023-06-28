@@ -38,6 +38,11 @@ class TestAction : AnAction() {
     private lateinit var jtPlistPath: JTextField
     private lateinit var jtBuildPath: JTextField
     private lateinit var uiHome: HomePage
+
+    private var flavorInfosText = ""
+    private var buildFlavor = mutableListOf<String>()
+    private var uTags = mutableSetOf<String>()
+
     override fun actionPerformed(e: AnActionEvent) {
         rootPath = e.project?.basePath!!
         Utils.initPath(rootPath)
@@ -75,17 +80,37 @@ class TestAction : AnAction() {
             initData()
         }
         uiHome.jtPlistPath.text = Utils.flavorPrefixPath.ifEmpty { Utils.findFlavorPrefixPath()[0] }
-        uiHome.jtBuildPath.text = Utils.buildGradlePath.ifEmpty {  Utils.findBuildGradlePrefixPath()[0] }
+        uiHome.jtBuildPath.text = Utils.buildGradlePath.ifEmpty { Utils.findBuildGradlePrefixPath()[0] }
+
+        uiHome.jType.model = DefaultComboBoxModel(Utils.pluginTypeAll.toTypedArray())
+        if (Utils.pluginType.isNotEmpty()) {
+            uiHome.jType.selectedItem = Utils.pluginType
+        }
+        uiHome.jType.addActionListener {
+            refreshUI()
+        }
+
+        uiHome.uAddBtn.addActionListener {
+            addUnityBuildCmd()
+        }
+
         jProjectList.addActionListener { refreshUI() }
         jbInitPath.text = "修改路径"
         jbInitPath.addActionListener {
             Utils.flavorPrefixPath = uiHome.jtPlistPath.text
             Utils.buildGradlePath = uiHome.jtBuildPath.text
+            Utils.unityRootPath = uiHome.uRootPath.text
             jProjectList.model = DefaultComboBoxModel(Utils.flavors.toTypedArray())
             Utils.refreshData(jProjectList.selectedItem!!.toString())
             refreshUI()
         }
-        jSubmitButton.addActionListener { submitBuild() }
+        jSubmitButton.addActionListener {
+            if (Utils.isUnity) {
+                submitBuildUnity()
+            } else {
+                submitBuild()
+            }
+        }
         jRootFrame.apply {
             setSize(1800, 1000)
             setLocationRelativeTo(null)
@@ -95,13 +120,69 @@ class TestAction : AnAction() {
         initData()
     }
 
+    private fun addUnityBuildCmd() {
+        uiHome.uAddBtn.text = "添加中..."
+        uiHome.uAddBtn.isEnabled = false
+        val version = uiHome.uVersion.text
+        val versionCode = uiHome.uVersionCode.text
+        uiHome.uTag.text?.let {
+            if (it.isNotEmpty()) {
+                val tag = "${selectedPacketCode.capitalize()}-${version}-${versionCode}-${todayDate()}-${it}"
+                uTags.add(tag)
+            }
+        }
+        flavorInfosText = uiHome.uFlavorInfo.text
+        val info = "$selectedPacketCode,$version,$versionCode"
+        if (flavorInfosText.contains(info)) {
+            ConfirmationDialog(
+                jRootFrame,
+                "通知",
+                "已添加",
+                { refreshUI() },
+                { refreshUI() })
+            return
+        } else {
+            if (flavorInfosText.isNotEmpty()) flavorInfosText += ";"
+            flavorInfosText += "$selectedPacketCode,$version,$versionCode"
+            if (!buildFlavor.contains(selectedPacketCode)) {
+                buildFlavor.add(selectedPacketCode)
+                uiHome.uBuildProjectCmd.text =
+                    uiHome.uBuildProjectCmd.text + if (buildFlavor.size == 1) selectedPacketCode else ",$selectedPacketCode"
+            }
+        }
+        refreshUI()
+    }
+
+    private fun switchAndroid() {
+        uiHome.jAndroid.isVisible = true
+        uiHome.jUnity.isVisible = false
+
+        jAppId.text = Utils.appId
+        jVersionCode.text = Utils.versionCode
+        if (Utils.versions.isNotEmpty()) jVersion.text = Utils.versions[0]
+        jBuildProjectCmd.text = "[Build_${selectedPacketCode.capitalize()}]"
+    }
+
+    private fun switchUnity() {
+        uiHome.jUnity.isVisible = true
+        uiHome.jAndroid.isVisible = false
+
+        uiHome.uAddBtn.text = "添加"
+        uiHome.uAddBtn.isEnabled = true
+        uiHome.uBuildProjectCmd.text = uiHome.uBuildProjectCmd.text.ifEmpty { "[Build] " }
+        uiHome.uAppId.text = Utils.appId
+        uiHome.uVersionCode.text = Utils.versionCode.ifEmpty { "1000" }
+        uiHome.uVersion.text = if (Utils.versions.isNotEmpty()) Utils.versions[0] else "1.0.0"
+        uiHome.uFlavorInfo.text = flavorInfosText.replace(";", "\n")
+    }
+
     private fun initData() {
-        Thread {
+        ThreadManager.executeTask {
             ConfigUtils.getConfigFile()
             jProjectList.model = DefaultComboBoxModel(Utils.flavors.toTypedArray())
             Utils.refreshData(jProjectList.selectedItem!!.toString())
             refreshUI()
-        }.start()
+        }
     }
 
     private fun initView() {
@@ -293,11 +374,11 @@ class TestAction : AnAction() {
             defaultCloseOperation = JFrame.HIDE_ON_CLOSE
             isVisible = true
         }
-        Thread {
+        ThreadManager.executeTask {
             jProjectList.model = DefaultComboBoxModel(Utils.flavors.toTypedArray())
             Utils.refreshData(jProjectList.selectedItem!!.toString())
             refreshUI()
-        }.start()
+        }
     }
 
     private fun submitBuild() {
@@ -339,11 +420,132 @@ class TestAction : AnAction() {
         commit(uiData)
     }
 
+    private fun submitBuildUnity() {
+        val sbFlavorInfos = StringBuilder()
+        for (s in uiHome.uFlavorInfo.text.split("\n")) {
+            if (s.isNotEmpty()) {
+                sbFlavorInfos.append(s).append(";")
+            }
+        }
+        if (sbFlavorInfos.isNotEmpty()) {
+            sbFlavorInfos.deleteAt(sbFlavorInfos.length - 1)
+        }
+        uiData = UIData(
+            versionCode = uiHome.uVersionCode.text.trim(),
+            versionName = uiHome.uVersion.text.trim(),
+            cmd = uiHome.uBuildProjectCmd.text.trim(),
+            applicationId = uiHome.uAppId.text.trim(),
+            flavorInfos = sbFlavorInfos.toString()
+        )
+        if (isNeedWarningDialog(uiData)) return
+
+        commitUnity(uiData)
+    }
+
+    private fun commitUnity(data: UIData) {
+        jSubmitButton.text = "正在操作，请稍后..."
+        jSubmitButton.isEnabled = false
+        jSubmitButton.repaint()
+        ThreadManager.executeTask {
+            println("data $data")
+            val gitPath = "$rootPath/.."
+            Utils.cmdExec("git", "reset", "--hard", "HEAD", dir = gitPath)
+
+            writeReplaceFile(data)
+            Utils.checkLogFileInGitignore()
+
+            Utils.cmdExec("git", "add", ".", dir = rootPath)
+            if (Utils.cmdExec("git", "status", dir = rootPath).contains("Changes")) {
+                Utils.cmdExec("git", "commit", "-m", data.cmd, dir = rootPath)
+            }
+
+            Utils.cmdExec("git", "add", ".", dir = gitPath)
+            if (Utils.cmdExec("git", "status", dir = gitPath).contains("Changes")) {
+                Utils.cmdExec("git", "commit", "-m", data.cmd, dir = gitPath)
+            } else {
+                Utils.cmdExec("git", "commit", "--allow-empty", "-m", data.cmd, dir = gitPath)
+            }
+            if (uTags.isNotEmpty()) {
+                for (tag in uTags) {
+                    // 删除本地和远端tag
+                    Utils.cmdExec("git", "tag", "-d", tag, dir = gitPath)
+                    Utils.cmdExec("git", "push", "origin", "--delete", "refs/tags/${tag}", dir = gitPath)
+                    // 添加tag
+                    Utils.cmdExec("git", "tag", tag, dir = gitPath)
+                }
+            }
+            uTags.clear()
+            buildFlavor.clear()
+            flavorInfosText = ""
+
+            ConfirmationDialog(jRootFrame, "通知", "提交成功，是否push到远端", {
+                ThreadManager.executeTask {
+                    val currentBranchName = Utils.cmdExec("git", "rev-parse", "--abbrev-ref", "HEAD", dir = rootPath)
+                    if (currentBranchName.isNotEmpty() && currentBranchName != "-1") {
+                        val isPushSuccess =
+                            Utils.cmdExec("git", "push", "origin", currentBranchName, "--tags", dir = rootPath) != "-1"
+                        if (isPushSuccess) {
+                            val branchName = Utils.cmdExec("git", "rev-parse", "--abbrev-ref", "HEAD", dir = gitPath)
+                            if (branchName.isNotEmpty() && branchName != "-1") {
+                                if (Utils.cmdExec(
+                                        "git",
+                                        "push",
+                                        "origin",
+                                        currentBranchName,
+                                        "--tags",
+                                        dir = gitPath
+                                    ) != "-1"
+                                ) {
+                                    ConfirmationDialog(
+                                        jRootFrame,
+                                        "通知",
+                                        "push成功！！！",
+                                        { refreshUI() },
+                                        { refreshUI() })
+                                } else {
+                                    ConfirmationDialog(
+                                        jRootFrame,
+                                        "通知",
+                                        "push命令执行失败了！！！",
+                                        { refreshUI() },
+                                        { refreshUI() })
+                                }
+                            } else {
+                                ConfirmationDialog(
+                                    jRootFrame,
+                                    "通知",
+                                    "rev-parse执行获取分支名失败了！！！，请检测后再尝试",
+                                    { refreshUI() },
+                                    { refreshUI() })
+                            }
+                        } else {
+                            ConfirmationDialog(
+                                jRootFrame,
+                                "通知",
+                                "push命令执行失败了！！！",
+                                { refreshUI() },
+                                { refreshUI() })
+                        }
+                    } else {
+                        ConfirmationDialog(
+                            jRootFrame,
+                            "通知",
+                            "rev-parse执行获取分支名失败了！！！，请检测后再尝试",
+                            { refreshUI() },
+                            { refreshUI() })
+                    }
+                }
+            }, {
+                refreshUI()
+            })
+        }
+    }
+
     private fun commit(data: UIData) {
         jSubmitButton.text = "正在操作，请稍后..."
         jSubmitButton.isEnabled = false
         jSubmitButton.repaint()
-        Thread {
+        ThreadManager.executeTask {
             if (data.cmd.contains("Build")) {
                 data.cmd += "(${data.versionName}-${data.versionCode})"
             }
@@ -385,28 +587,18 @@ class TestAction : AnAction() {
                 Utils.cmdExec("git", "tag", data.tag)
             }
             ConfirmationDialog(jRootFrame, "通知", "提交成功，是否push到远端", {
-                Thread {
+                ThreadManager.executeTask {
                     val currentBranchName = Utils.cmdExec("git", "rev-parse", "--abbrev-ref", "HEAD", dir = rootPath)
                     if (currentBranchName.isNotEmpty() && currentBranchName != "-1") {
-                        if (if (data.tag.isNotEmpty()) {
-                                Utils.cmdExec(
-                                    "git",
-                                    "push",
-                                    "origin",
-                                    currentBranchName,
-                                    "--tags",
-                                    dir = rootPath
-                                ) != "-1"
-                            } else {
-                                Utils.cmdExec(
-                                    "git",
-                                    "push",
-                                    "origin",
-                                    currentBranchName,
-                                    "--tags",
-                                    dir = rootPath
-                                ) != "-1"
-                            }
+                        if (Utils.cmdExec(
+                                "git",
+                                "push",
+                                "origin",
+                                currentBranchName,
+                                "--tags",
+                                dir = rootPath
+                            ) != "-1"
+
                         ) {
                             ConfirmationDialog(
                                 jRootFrame,
@@ -430,11 +622,11 @@ class TestAction : AnAction() {
                             { refreshUI() },
                             { refreshUI() })
                     }
-                }.start()
+                }
             }, {
                 refreshUI()
             })
-        }.start()
+        }
     }
 
     /*  private fun updateConfigFile() {
@@ -469,8 +661,8 @@ class TestAction : AnAction() {
             showWarningDialog("versionName is empty")
             return true
         }
-        if (data.versionName.isEmpty()) {
-            showWarningDialog("versionName is empty")
+        if (Utils.isUnity && data.flavorInfos.isEmpty()) {
+            showWarningDialog("flavorInfos is empty")
             return true
         }
         return false
@@ -482,9 +674,12 @@ class TestAction : AnAction() {
     }
 
     private fun refreshUI() {
+        Utils.pluginType = uiHome.jType.selectedItem!!.toString()
         ConfigUtils.refreshReplaceLib()
         Utils.refreshData(jProjectList.selectedItem!!.toString())
         SwingUtilities.invokeLater {
+            uiHome.uPathJPanel.isVisible = Utils.isUnity
+            uiHome.uRootPath.text = Utils.unityRootPath
             uiHome.jtPlistPath.text = Utils.flavorPrefixPath
             uiHome.jtBuildPath.text = Utils.buildGradlePath
             jSubmitButton.text = "提交打包请求"
@@ -492,21 +687,6 @@ class TestAction : AnAction() {
             uiHome.jLibAd.text = Utils.libAds
             uiHome.jLibFramework.text = Utils.libAppFramework
             uiHome.jLibSecurity.text = Utils.libSecurity
-            selectedPacketCode = jProjectList.selectedItem!!.toString()
-            println(selectedPacketCode)
-//            jProjectTip.text = config.tip
-            jProjectName.text = "项目名称：${Utils.appName}"
-            jAppId.text = Utils.appId
-            jVersionCode.text = Utils.versionCode
-            var historyVersion = Utils.versions.toString()
-            historyVersion = historyVersion.substring(1, historyVersion.length - 1)
-            jHistoryVersion.text =
-                if (historyVersion.contains(",")) historyVersion.replace(", ", "\n") else historyVersion
-            SwingUtilities.invokeLater {
-                jHistoryScrollPane.verticalScrollBar.value = 0
-            }
-            if (Utils.versions.isNotEmpty()) jVersion.text = Utils.versions[0]
-            jBuildProjectCmd.text = "[Build_${selectedPacketCode.capitalize()}]"
             uiHome.jTip.text = ConfigUtils.getTip()
             val libChangList = ConfigUtils.config.libReplace.filter { it.isEnable() }
             if (libChangList.isNotEmpty()) {
@@ -523,6 +703,20 @@ class TestAction : AnAction() {
                 uiHome.jLibChange.text = "无需变更"
             }
 
+            selectedPacketCode = jProjectList.selectedItem!!.toString()
+            println(selectedPacketCode)
+            jProjectName.text = "项目名称：${Utils.appName}"
+            var historyVersion = Utils.versions.toString()
+            historyVersion = historyVersion.substring(1, historyVersion.length - 1)
+            jHistoryVersion.text =
+                if (historyVersion.contains(",")) historyVersion.replace(", ", "\n") else historyVersion
+            jHistoryScrollPane.verticalScrollBar.value = 0
+
+            if (Utils.pluginType == "Unity") {
+                switchUnity()
+            } else {
+                switchAndroid()
+            }
         }
     }
 
@@ -531,21 +725,36 @@ class TestAction : AnAction() {
         val yamlPath = "${Utils.flavorPrefixPath}/${jProjectList.selectedItem!!}/assets/config.yaml"
         Utils.writeLogToFile("Start WriteReplaceFile buildConfigPath:$buildConfigPath, yamlPath:$yamlPath")
         // 修改build文件
-        replaceFile(
-            yamlPath,
-            PLIST_URL_REGEX,
-            "${data.versionName}-${data.versionCode}"
-        )
-        replaceFile(
-            buildConfigPath,
-            VERSION_CODE_REGEX.replace("flavor", selectedPacketCode),
-            data.versionCode
-        )
-        replaceFile(
-            buildConfigPath,
-            VERSION_NAME_REGEX.replace("flavor", selectedPacketCode),
-            data.versionName
-        )
+        if (!Utils.isUnity) {
+            replaceFile(
+                yamlPath,
+                PLIST_URL_REGEX,
+                "${data.versionName}-${data.versionCode}"
+            )
+            replaceFile(
+                buildConfigPath,
+                VERSION_CODE_REGEX.replace("flavor", selectedPacketCode),
+                data.versionCode
+            )
+            replaceFile(
+                buildConfigPath,
+                VERSION_NAME_REGEX.replace("flavor", selectedPacketCode),
+                data.versionName
+            )
+//        replaceFile(
+//            buildConfigPath,
+//            APPLICATION_ID_REGEX.replace("flavor", selectedPacketCode),
+//            data.applicationId
+//        )
+        } else {
+            val flavorInfoPath = "${Utils.rootPath}/../gitlabci_unity_build.sh"
+            println("flavorInfoPath=$flavorInfoPath")
+            replaceFile(
+                flavorInfoPath,
+                FLAVORINFOS_REGEX,
+                data.flavorInfos
+            )
+        }
         if (uiHome.jLibChangeSwitch.isSelected) {
             for (lib in ConfigUtils.config.libReplace) {
                 if (lib.isEnable()) {
@@ -553,11 +762,6 @@ class TestAction : AnAction() {
                 }
             }
         }
-//        replaceFile(
-//            buildConfigPath,
-//            APPLICATION_ID_REGEX.replace("flavor", selectedPacketCode),
-//            data.applicationId
-//        )
         Utils.writeLogToFile("修改完成")
     }
 

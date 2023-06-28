@@ -30,4 +30,18 @@ public class HomePage {
     public JCheckBox jLibChangeSwitch;
     public JButton jToken;
     public JTextField jTokenInput;
+    public JPanel jPanelOption;
+    public JPanel jPanelProjectIntro;
+    public JComboBox<String> jType;
+    public JPanel jUnity;
+    public JPanel jAndroid;
+    public JTextField uVersion;
+    public JTextField uVersionCode;
+    public JTextField uTag;
+    public JButton uAddBtn;
+    public JTextField uAppId;
+    public JTextField uBuildProjectCmd;
+    public JTextArea uFlavorInfo;
+    public JPanel uPathJPanel;
+    public JTextField uRootPath;
 }

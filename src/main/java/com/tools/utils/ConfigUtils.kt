@@ -19,7 +19,10 @@ object ConfigUtils {
     fun getConfigFile() {
         val client = OkHttpClient()
         if (token.isEmpty()) {
-            token = System.getenv("TOOLS_PACKAGE_TOKEN")
+            try {
+                token = System.getenv("TOOLS_PACKAGE_TOKEN")
+            }catch (_: Exception) {
+            }
         }
         if (token.isEmpty()) {
             Utils.writeLogToFile("网络获取文件失败,token is null")

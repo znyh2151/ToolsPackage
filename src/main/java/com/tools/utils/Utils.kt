@@ -10,12 +10,15 @@ import java.util.*
 import kotlin.text.StringBuilder
 
 const val APP_NAME_REGEX = "<string\\s+name=\"app_name\">([^<]*)</string>"
+const val APP_NAME_UNITY_REGEX = "<string\\s+name=\"pig_farm_name\">([^<]*)</string>"
 
 object Utils {
     private val plistPathKey get() = rootPath + "jtPlistPath"
     private val buildPathKey get() = rootPath + "jtBuildPath"
+    private val pluginTypeKey get() = rootPath + "pluginTypeKey"
 
     var rootPath = ""
+    var unityRootPath = ""
     var systemPath = ""
     var flavorPrefixPath
         get() = if (rootPath.isEmpty()) "" else PropertiesComponent.getInstance().getValue(plistPathKey, "")
@@ -27,6 +30,14 @@ object Utils {
         set(value) {
             PropertiesComponent.getInstance().setValue(buildPathKey, value)
         }
+
+    val pluginTypeAll = listOf("Android", "Unity")
+    var pluginType
+        get() = if (rootPath.isEmpty()) "" else PropertiesComponent.getInstance().getValue(pluginTypeKey, "Android")
+        set(value) {
+            PropertiesComponent.getInstance().setValue(pluginTypeKey, value)
+        }
+    val isUnity get() = pluginType == "Unity"
 
     var versions = emptyList<String>()
     var flavors = emptyList<String>()
@@ -45,10 +56,13 @@ object Utils {
 
     fun initPath(rootPath: String) {
         this.rootPath = rootPath
+        this.unityRootPath = "${rootPath}/.."
         versions = emptyList()
         flavors = emptyList()
         println(rootPath)
+        println(unityRootPath)
         writeLogToFile("rootPath:$rootPath")
+        writeLogToFile("rootPath:$unityRootPath")
     }
 
     fun refreshData(flavor: String) {
@@ -63,7 +77,7 @@ object Utils {
         appName = getAppName(flavor)
         appId = getAppId(flavor)
         versions = getVersion(flavor)
-        versionCode = getAppVersionCode(flavor)
+        if (!isUnity) versionCode = getAppVersionCode(flavor)
         getAppLibVersion(flavor)
         println("name: $appName, id: $appId,versionCode: $versionCode, versions: $versions")
     }
@@ -106,7 +120,7 @@ object Utils {
     private fun getAllFlavors(): List<String> {
         flavorPrefixPath = flavorPrefixPath.ifEmpty { findFlavorPrefixPath()[0] }
         buildGradlePath = buildGradlePath.ifEmpty { findBuildGradlePrefixPath()[0] }
-        cmdExec("git", "fetch", "origin", "--tags", "-f")
+        cmdExec("git", "fetch", "origin", "--tags", "-f", dir = if (isUnity) unityRootPath else rootPath)
         val mainSrcPath = File(flavorPrefixPath)
         if (!mainSrcPath.exists() || !mainSrcPath.isDirectory) {
             return emptyList()
@@ -152,7 +166,9 @@ object Utils {
             val content = reader.readText()
             reader.close()
             // 使用正则表达式匹配 app_name 值
-            val matchResult = APP_NAME_REGEX.toRegex().find(content)
+            val matchResult =
+                if (isUnity) APP_NAME_UNITY_REGEX.toRegex().find(content) else APP_NAME_REGEX.toRegex()
+                    .find(content)
             if (matchResult != null) {
                 val result = matchResult.groupValues[1]
                 writeLogToFile("getAppName $result")
@@ -210,25 +226,36 @@ object Utils {
         }
     }
 
+    data class VersionNameCode(val name: String, val code: String)
+
     private fun getVersion(flavor: String): List<String> {
-        val allTags = cmdExec("git", "tag", "--sort=-creatordate", "--merged", isLog = false)
+        val allTags = cmdExec("git", "tag", "--sort=-creatordate", "--merged", isLog = true, dir = if (isUnity) unityRootPath else rootPath)
         val tags = allTags.split("\n").filter { it.startsWith("${flavor.capitalize()}-", ignoreCase = true) }
-        val tagList = mutableListOf<String>()
+        val tagList = mutableListOf<VersionNameCode>()
         for (tag in tags) {
             val regex = Regex("""\d+\.\d+\.\d+""")  // 定义匹配规则
             val matchResult = regex.find(tag)  // 查找匹配结果
             if (matchResult != null) {  // 如果找到了匹配结果
                 val matchedTag = matchResult.value  // 获取匹配到的字符串
-                tagList.add(matchedTag)  // 添加到列表中
+                tagList.add(
+                    VersionNameCode(
+                        matchedTag,
+                        (Regex("(?<=\\.\\d{0,10}-)[0-9]+(?=-)").find(tag)?.groupValues?.get(0) ?: "")
+                    )
+                )  // 添加到列表中
             }
+            println("debug ${tag}, version Code=$versionCode")
         }
         val versions = tagList.sortedWith(compareBy(
-            { it.split(".").first().toInt() },
-            { it.split(".")[1].toInt() },
-            { it.split(".").last().toInt() }
+            { it.name.split(".").first().toInt() },
+            { it.name.split(".")[1].toInt() },
+            { it.name.split(".").last().toInt() }
         )).reversed()
+        if (isUnity) {
+            versionCode = if (versions.isNotEmpty()) versions[0].code else ""
+        }
         writeLogToFile("getVersion: $versions")
-        return versions
+        return versions.map { it.name }
     }
 
     fun cmdExec(vararg command: String, dir: String = rootPath, isLog: Boolean = true): String {
