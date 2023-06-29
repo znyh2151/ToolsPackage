@@ -477,6 +477,7 @@ class TestAction : AnAction() {
             uTags.clear()
             buildFlavor.clear()
             flavorInfosText = ""
+            uiHome.uBuildProjectCmd.text = ""
 
             ConfirmationDialog(jRootFrame, "通知", "提交成功，是否push到远端", {
                 ThreadManager.executeTask {
@@ -491,7 +492,7 @@ class TestAction : AnAction() {
                                         "git",
                                         "push",
                                         "origin",
-                                        currentBranchName,
+                                        branchName,
                                         "--tags",
                                         dir = gitPath
                                     ) != "-1"

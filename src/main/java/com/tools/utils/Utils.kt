@@ -229,7 +229,7 @@ object Utils {
     data class VersionNameCode(val name: String, val code: String)
 
     private fun getVersion(flavor: String): List<String> {
-        val allTags = cmdExec("git", "tag", "--sort=-creatordate", "--merged", isLog = true, dir = if (isUnity) unityRootPath else rootPath)
+        val allTags = cmdExec("git", "tag", "--sort=-creatordate", "--merged", isLog = false, dir = if (isUnity) unityRootPath else rootPath)
         val tags = allTags.split("\n").filter { it.startsWith("${flavor.capitalize()}-", ignoreCase = true) }
         val tagList = mutableListOf<VersionNameCode>()
         for (tag in tags) {
