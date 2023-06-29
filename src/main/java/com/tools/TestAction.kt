@@ -448,7 +448,7 @@ class TestAction : AnAction() {
         jSubmitButton.repaint()
         ThreadManager.executeTask {
             println("data $data")
-            val gitPath = "$rootPath/.."
+            val gitPath = Utils.unityRootPath
             Utils.cmdExec("git", "reset", "--hard", "HEAD", dir = gitPath)
 
             writeReplaceFile(data)
@@ -748,7 +748,7 @@ class TestAction : AnAction() {
 //            data.applicationId
 //        )
         } else {
-            val flavorInfoPath = "${Utils.rootPath}/../gitlabci_unity_build.sh"
+            val flavorInfoPath = "${Utils.unityRootPath}/gitlabci_unity_build.sh"
             println("flavorInfoPath=$flavorInfoPath")
             replaceFile(
                 flavorInfoPath,
