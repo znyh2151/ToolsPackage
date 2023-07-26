@@ -13,20 +13,21 @@ const val APP_NAME_REGEX = "<string\\s+name=\"app_name\">([^<]*)</string>"
 const val APP_NAME_UNITY_REGEX = "<string\\s+name=\"pig_farm_name\">([^<]*)</string>"
 
 object Utils {
-    private val plistPathKey get() = rootPath + "jtPlistPath"
-    private val buildPathKey get() = rootPath + "jtBuildPath"
+    private val plistPathKey get() = rootPath + currentBranch + "jtPlistPath"
+    private val buildPathKey get() = rootPath + currentBranch + "jtBuildPath"
     private val pluginTypeKey get() = rootPath + "pluginTypeKey"
 
+    var currentBranch = ""
     var rootPath = ""
     var unityRootPath = ""
     var systemPath = ""
     var flavorPrefixPath
-        get() = if (rootPath.isEmpty()) "" else PropertiesComponent.getInstance().getValue(plistPathKey, "")
+        get() = if (rootPath.isEmpty() || currentBranch.isEmpty()) "" else PropertiesComponent.getInstance().getValue(plistPathKey, "")
         set(value) {
             PropertiesComponent.getInstance().setValue(plistPathKey, value)
         }
     var buildGradlePath
-        get() = if (rootPath.isEmpty()) "" else PropertiesComponent.getInstance().getValue(buildPathKey, "")
+        get() = if (rootPath.isEmpty() || currentBranch.isEmpty()) "" else PropertiesComponent.getInstance().getValue(buildPathKey, "")
         set(value) {
             PropertiesComponent.getInstance().setValue(buildPathKey, value)
         }
@@ -55,12 +56,15 @@ object Utils {
     var libAds = ""
 
     fun initPath(rootPath: String) {
+        currentBranch = ""
         this.rootPath = rootPath
         this.unityRootPath = "${rootPath}/.."
         versions = emptyList()
         flavors = emptyList()
+        currentBranch = cmdExec("git", "branch", "--show-current")
         println(rootPath)
         println(unityRootPath)
+        println("currentBranch:$currentBranch")
         writeLogToFile("rootPath:$rootPath")
         writeLogToFile("rootPath:$unityRootPath")
     }
@@ -351,6 +355,7 @@ object Utils {
     }
 
     fun initSystemPath() {
+        if (systemPath.isNotEmpty()) return
         val home = System.getenv("HOME")
         val path1 = cmdExec("/bin/sh", "-c", "source /etc/profile && env", isLog = false).split("\n")
             .find { it.startsWith("PATH") }
