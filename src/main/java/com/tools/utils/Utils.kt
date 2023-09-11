@@ -4,6 +4,7 @@ import com.intellij.ide.util.PropertiesComponent
 import com.tools.bean.APPLICATION_ID_REGEX
 import com.tools.bean.CONFIG_LOG
 import com.tools.bean.VERSION_CODE_REGEX
+import com.tools.bean.VersionNameCode
 import java.io.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -40,7 +41,7 @@ object Utils {
         }
     val isUnity get() = pluginType == "Unity"
 
-    var versions = emptyList<String>()
+    var versions = emptyList<VersionNameCode>()
     var flavors = emptyList<String>()
         get() {
             return field.ifEmpty {
@@ -230,21 +231,25 @@ object Utils {
         }
     }
 
-    data class VersionNameCode(val name: String, val code: String)
-
-    private fun getVersion(flavor: String): List<String> {
+    private fun getVersion(flavor: String): List<VersionNameCode> {
         val allTags = cmdExec("git", "tag", "--sort=-creatordate", "--merged", isLog = false, dir = if (isUnity) unityRootPath else rootPath)
         val tags = allTags.split("\n").filter { it.startsWith("${flavor.capitalize()}-", ignoreCase = true) }
         val tagList = mutableListOf<VersionNameCode>()
+        var index = 0
         for (tag in tags) {
+            index += 1
             val regex = Regex("""\d+\.\d+\.\d+""")  // 定义匹配规则
             val matchResult = regex.find(tag)  // 查找匹配结果
             if (matchResult != null) {  // 如果找到了匹配结果
                 val matchedTag = matchResult.value  // 获取匹配到的字符串
+                val versionCode = (Regex("(?<=\\.\\d{0,10}-)[0-9]+(?=-)").find(tag)?.groupValues?.get(0) ?: "")
                 tagList.add(
                     VersionNameCode(
+                        index.toString(),
                         matchedTag,
-                        (Regex("(?<=\\.\\d{0,10}-)[0-9]+(?=-)").find(tag)?.groupValues?.get(0) ?: "")
+                        versionCode,
+                        "",
+                        tag
                     )
                 )  // 添加到列表中
             }
@@ -259,7 +264,7 @@ object Utils {
             versionCode = if (versions.isNotEmpty()) versions[0].code else ""
         }
         writeLogToFile("getVersion: $versions")
-        return versions.map { it.name }
+        return versions
     }
 
     fun cmdExec(vararg command: String, dir: String = rootPath, isLog: Boolean = true): String {

@@ -159,7 +159,7 @@ class TestAction : AnAction() {
 
         jAppId.text = Utils.appId
         jVersionCode.text = Utils.versionCode
-        if (Utils.versions.isNotEmpty()) jVersion.text = Utils.versions[0]
+        if (Utils.versions.isNotEmpty()) jVersion.text = Utils.versions[0].name
         jBuildProjectCmd.text = "[Build_${selectedPacketCode.capitalize()}]"
     }
 
@@ -172,7 +172,7 @@ class TestAction : AnAction() {
         uiHome.uBuildProjectCmd.text = uiHome.uBuildProjectCmd.text.ifEmpty { "[Build] " }
         uiHome.uAppId.text = Utils.appId
         uiHome.uVersionCode.text = Utils.versionCode.ifEmpty { "1000" }
-        uiHome.uVersion.text = if (Utils.versions.isNotEmpty()) Utils.versions[0] else "1.0.0"
+        uiHome.uVersion.text = if (Utils.versions.isNotEmpty()) Utils.versions[0].name else "1.0.0"
         uiHome.uFlavorInfo.text = flavorInfosText.replace(";", "\n")
     }
 
@@ -396,7 +396,7 @@ class TestAction : AnAction() {
         )
         if (isNeedWarningDialog(uiData)) return
         if (Utils.versions.isNotEmpty()) {
-            val diffCode = getVersionDiff(uiData.versionName, Utils.versions[0])
+            val diffCode = getVersionDiff(uiData.versionName, Utils.versions[0].name)
             // 版本号异常
             if (diffCode == 0) {
                 showWarningDialog("版本号与上次版本相同，请检测！！！<br><br> 是否确定打包？") {
@@ -410,12 +410,12 @@ class TestAction : AnAction() {
                 }
                 return
             }
-            if (Utils.versions.contains(uiData.versionName.trim())) {
-                showWarningDialog("版本号已存在，请确认是否继续！！！<br><br> 是否确定打包？") {
-                    commit(uiData)
-                }
-                return
-            }
+//            if (Utils.versions.contains(uiData.versionName.trim())) {
+//                showWarningDialog("版本号已存在，请确认是否继续！！！<br><br> 是否确定打包？") {
+//                    commit(uiData)
+//                }
+//                return
+//            }
         }
         commit(uiData)
     }
@@ -707,8 +707,12 @@ class TestAction : AnAction() {
             selectedPacketCode = jProjectList.selectedItem!!.toString()
             println(selectedPacketCode)
             jProjectName.text = "项目名称：${Utils.appName}"
-            var historyVersion = Utils.versions.toString()
-            historyVersion = historyVersion.substring(1, historyVersion.length - 1)
+            val historyVersionSb = StringBuilder()
+            Utils.versions.forEachIndexed { index, versionNameCode ->
+                historyVersionSb.append(versionNameCode.name + "\t" + versionNameCode.original + "\n")
+            }
+            var historyVersion = historyVersionSb.toString()
+            historyVersion = historyVersion.substring(0, historyVersion.length - 1)
             jHistoryVersion.text =
                 if (historyVersion.contains(",")) historyVersion.replace(", ", "\n") else historyVersion
             jHistoryScrollPane.verticalScrollBar.value = 0
