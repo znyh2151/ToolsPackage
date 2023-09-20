@@ -94,7 +94,9 @@ class TestAction : AnAction() {
             addUnityBuildCmd()
         }
 
-        jProjectList.addActionListener { refreshUI() }
+        jProjectList.addActionListener {
+            refreshUI()
+        }
         jbInitPath.text = "修改路径"
         jbInitPath.addActionListener {
             Utils.flavorPrefixPath = uiHome.jtPlistPath.text
@@ -712,10 +714,13 @@ class TestAction : AnAction() {
                 historyVersionSb.append(versionNameCode.name + "\t" + versionNameCode.original + "\n")
             }
             var historyVersion = historyVersionSb.toString()
-            historyVersion = historyVersion.substring(0, historyVersion.length - 1)
-            jHistoryVersion.text =
-                if (historyVersion.contains(",")) historyVersion.replace(", ", "\n") else historyVersion
-            jHistoryScrollPane.verticalScrollBar.value = 0
+            if (historyVersion.isNotEmpty()) {
+                historyVersion = historyVersion.substring(0, historyVersion.length - 1)
+                jHistoryVersion.text = if (historyVersion.contains(",")) historyVersion.replace(", ", "\n") else historyVersion
+                jHistoryScrollPane.verticalScrollBar.value = 0
+            } else {
+                jHistoryVersion.text = ""
+            }
 
             if (Utils.pluginType == "Unity") {
                 switchUnity()

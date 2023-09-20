@@ -209,6 +209,9 @@ object Utils {
     }
 
     private fun getAppLibVersion(flavor: String) {
+        libAds = ""
+        libSecurity = ""
+        libAppFramework = ""
         val buildFile = File(buildGradlePath)
         val content = buildFile.readText()
         val regex = "['\"]cn.*.appframework:libSecurity.*['\"]".toRegex()
